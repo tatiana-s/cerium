@@ -8,13 +8,25 @@ use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
+// Modules.
+mod ddlog_utils;
+mod parse_utils;
+mod tree_lib;
+
+use crate::parse_utils::parser;
+
 fn main() {
     // Read command line arguments.
     // Arguments can't contain invalid unicode otherwise panic.
     let args: Vec<String> = env::args().collect();
     let file_path = &args[1];
 
-    // Process input file in a loop.
+    // Read initial input file.
+    let file_contents = fs::read_to_string(file_path).expect("File couldn't be read");
+    println!("{}", file_contents);
+    parser::parse_input_to_sexp(&file_contents);
+
+    // Continue watching the file for changes.
     if let Err(e) = process_file_on_write(file_path) {
         println!("error: {:?}", e)
     }
@@ -40,6 +52,7 @@ fn process_file_on_write(file_path: &String) -> notify::Result<()> {
                         let file_contents =
                             fs::read_to_string(file_path).expect("File couldn't be read");
                         println!("{}", file_contents);
+                        parser::parse_input_to_sexp(&file_contents);
                     }
                     _ => {}
                 }
