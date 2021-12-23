@@ -10,30 +10,26 @@ use std::time::Duration;
 
 // Modules.
 mod ddlog_utils;
-mod parse_utils;
+mod parser;
 mod tree_lib;
-
-use crate::parse_utils::parser;
 
 fn main() {
     // Read command line arguments.
-    // Arguments can't contain invalid unicode otherwise panic.
+    // Arguments can't contain invalid unicode characters.
     let args: Vec<String> = env::args().collect();
     let file_path = &args[1];
 
-    // Read initial input file.
-    let file_contents = fs::read_to_string(file_path).expect("File couldn't be read");
-    println!("{}", file_contents);
-    parser::parse_input_to_sexp(&file_contents);
+    // Check initial input file.
+    type_check_file(file_path);
 
     // Continue watching the file for changes.
-    if let Err(e) = process_file_on_write(file_path) {
+    if let Err(e) = watch_for_write(file_path) {
         println!("error: {:?}", e)
     }
 }
 
 // Watches file for writes and passes it off to the parser in the event of one.
-fn process_file_on_write(file_path: &String) -> notify::Result<()> {
+fn watch_for_write(file_path: &String) -> notify::Result<()> {
     // Create a channel to receive the events.
     let (tx, rx) = channel();
 
@@ -45,19 +41,22 @@ fn process_file_on_write(file_path: &String) -> notify::Result<()> {
 
     loop {
         match rx.recv() {
-            Ok(event) => {
-                match event {
-                    DebouncedEvent::Write(ref _path) => {
-                        // Read input file.
-                        let file_contents =
-                            fs::read_to_string(file_path).expect("File couldn't be read");
-                        println!("{}", file_contents);
-                        parser::parse_input_to_sexp(&file_contents);
-                    }
-                    _ => {}
+            Ok(event) => match event {
+                DebouncedEvent::Write(ref _path) => {
+                    // Check file on any completed write.
+                    type_check_file(file_path);
                 }
-            }
+                _ => {}
+            },
             Err(e) => println!("error: {:?}", e),
         }
     }
+}
+
+fn type_check_file(file_path: &String) {
+    // Read input file.
+    let file_contents = fs::read_to_string(file_path).expect("File couldn't be read");
+    println!("{}", file_contents);
+    // Parse input.
+    parser::parse_input_to_sexp(&file_contents);
 }

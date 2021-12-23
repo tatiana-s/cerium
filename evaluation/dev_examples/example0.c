@@ -2,5 +2,5 @@
 
 int main(void)
 {
-    return 22;
+    return 42;
 }
