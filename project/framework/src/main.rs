@@ -8,10 +8,16 @@ use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
+// Imports for tree-sitter.
+use tree_sitter::{Language, Parser};
+
+extern "C" {
+    fn tree_sitter_c() -> Language;
+}
+
 // Modules.
 mod ddlog_utils;
-mod parser;
-mod tree_lib;
+mod tree_utils;
 
 fn main() {
     // Read command line arguments.
@@ -57,6 +63,11 @@ fn type_check_file(file_path: &String) {
     // Read input file.
     let file_contents = fs::read_to_string(file_path).expect("File couldn't be read");
     println!("{}", file_contents);
-    // Parse input.
-    parser::parse_input_to_sexp(&file_contents);
+    // Create parser
+    let language = unsafe { tree_sitter_c() };
+    let mut parser = Parser::new();
+    parser.set_language(language).unwrap();
+    // Parse into tree and print.
+    let tree = parser.parse(file_contents, None).unwrap();
+    println!("{}", tree.root_node().to_sexp());
 }
