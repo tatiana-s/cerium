@@ -5,8 +5,7 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [build-dependencies]
-cc="*"
 
 [dependencies]
 notify = "4.0.16"
-tree-sitter="*"
+lang-c = "*"

@@ -1,19 +1,18 @@
+extern crate lang_c;
 extern crate notify;
 
+// General imports.
 use std::env;
-use std::fs;
 
 // Imports for notify-rs.
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
-// Imports for tree-sitter.
-use tree_sitter::{Language, Parser};
-
-extern "C" {
-    fn tree_sitter_c() -> Language;
-}
+// Imports for C parser.
+use lang_c::driver::{parse, Config};
+use lang_c::print::Printer;
+use lang_c::visit::Visit;
 
 // Modules.
 mod ddlog_utils;
@@ -29,6 +28,7 @@ fn main() {
     type_check_file(file_path);
 
     // Continue watching the file for changes.
+    // TO-DO: add support for type-checking directories.
     if let Err(e) = watch_for_write(file_path) {
         println!("error: {:?}", e)
     }
@@ -60,14 +60,16 @@ fn watch_for_write(file_path: &String) -> notify::Result<()> {
 }
 
 fn type_check_file(file_path: &String) {
-    // Read input file.
-    let file_contents = fs::read_to_string(file_path).expect("File couldn't be read");
-    println!("{}", file_contents);
-    // Create parser
-    let language = unsafe { tree_sitter_c() };
-    let mut parser = Parser::new();
-    parser.set_language(language).unwrap();
-    // Parse into tree and print.
-    let tree = parser.parse(file_contents, None).unwrap();
-    println!("{}", tree.root_node().to_sexp());
+    // Create parser.
+    // TO-DO: don't create new on each parse.
+    let config = Config::default();
+    let parse_output = parse(&config, file_path);
+    match parse_output {
+        Ok(parse) => {
+            let s = &mut String::new();
+            Printer::new(s).visit_translation_unit(&parse.unit);
+            println!("{}", s);
+        }
+        Err(e) => println!("error: {:?}", e),
+    }
 }
