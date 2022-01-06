@@ -1,61 +1,61 @@
 // Type aliases for consistency and easy changes.
-type Id = u32;
+type ID = u32;
 type Scope = (u32, u32);
 
 // Defines the permitted language constructs.
 enum NodeType {
     TranslationUnit {
-        id: Id,
-        body_ids: Vec<Id>,
+        id: ID,
+        body_ids: Vec<ID>,
     },
     FunctionDef {
-        id: Id,
+        id: ID,
         fun_name: String,
-        return_id: Id,
-        arg_ids: Vec<Id>,
+        return_id: ID,
+        arg_ids: Vec<ID>,
     },
     FunctionCall {
-        id: Id,
-        fun_id: Id,
-        arg_ids: Vec<Id>,
+        id: ID,
+        fun_id: ID,
+        arg_ids: Vec<ID>,
     },
     // Statements.
     Block {
-        ids: Vec<Id>,
+        ids: Vec<ID>,
     },
     Assignment {
-        id: Id,
+        id: ID,
         var_name: String,
-        expr_id: Id,
+        expr_id: ID,
     },
     Return {
-        id: Id,
-        expr_id: Id,
+        id: ID,
+        expr_id: ID,
     },
     // Expressions.
     BinaryOp {
-        id: Id,
-        arg1_id: Id,
-        ar2_id: Id,
+        id: ID,
+        arg1_id: ID,
+        ar2_id: ID,
     },
     // Leaf types.
     Void {
-        id: Id,
+        id: ID,
     },
     Int {
-        id: Id,
+        id: ID,
     },
     Float {
-        id: Id,
+        id: ID,
     },
     Char {
-        id: Id,
+        id: ID,
     },
 }
 
 // Building block of AST.
 struct AstNode {
-    node_id: Id,
+    node_id: ID,
     node_type: NodeType,
     scope: Scope,
     children: Vec<AstNode>,

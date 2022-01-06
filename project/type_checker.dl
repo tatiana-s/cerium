@@ -1,0 +1,11 @@
+typedef ID = signed<32>
+typedef Type = OkType
+             | ErrorType
+             | VoidType 
+             | IntType 
+             | FloatType 
+             | CharType
+
+input relation TranslationUnit(id: ID, body_ids: Vec<ID>)
+
+output relation OkProgram(id: ID, t: Type)

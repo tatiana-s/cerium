@@ -1,0 +1,3 @@
+ddlog -i type_checker.dl 
+(cd type_checker_ddlog && cargo build --release)
+./type_checker_ddlog/target/release/type_checker_cli
