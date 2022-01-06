@@ -15,8 +15,8 @@ use lang_c::print::Printer;
 use lang_c::visit::Visit;
 
 // Modules.
-mod ddlog_utils;
-mod tree_utils;
+mod ast;
+mod ddlog_interface;
 
 fn main() {
     // Read command line arguments.
