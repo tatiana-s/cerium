@@ -1,6 +1,7 @@
 extern crate notify;
 
 // General imports.
+use std::collections::HashSet;
 use std::env;
 
 // Imports for notify-rs.
@@ -8,9 +9,12 @@ use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
+// DDlog imports.
+use differential_datalog::api::HDDlog;
+
 // Modules.
-mod ast;
-mod ddlog_interface;
+pub mod ast;
+pub mod ddlog_interface;
 
 fn main() {
     // Read command line arguments.
@@ -19,18 +23,36 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let file_path = &args[1];
 
-    // Check initial input file.
-    type_check_file(file_path);
+    // Create instance of the DDlog type checking program.
+    let (hddlog, _) = type_checker_ddlog::run(1, false).unwrap();
+
+    // Type check initial input file.
+    let mut prev_ast: Option<ast::AstNode> = None;
+    match ast::parse_file_into_ast(file_path) {
+        Ok(ast) => {
+            let insert_set: HashSet<ast::NodeKind> = ast::get_initial_node_set(&ast);
+            let delete_set: HashSet<ast::NodeKind> = HashSet::new();
+            ddlog_interface::run_ddlog_type_checker(&hddlog, insert_set, delete_set);
+            prev_ast = Some(ast);
+        }
+        // TO-DO: some better error handling everywhere.
+        // TO-DO: data flow for error reporting extension?
+        Err(_) => (),
+    }
 
     // Continue watching the file for changes.
     // TO-DO: add support for type-checking directories.
-    if let Err(e) = watch_for_write(file_path) {
+    if let Err(e) = watch_for_write(file_path, &prev_ast.unwrap(), hddlog) {
         println!("error: {:?}", e)
     }
 }
 
 // Watches file for writes and passes it off to the parser in the event of one.
-fn watch_for_write(file_path: &String) -> notify::Result<()> {
+fn watch_for_write(
+    file_path: &String,
+    prev_ast: &ast::AstNode,
+    hddlog: HDDlog,
+) -> notify::Result<()> {
     // Create a channel to receive the events.
     let (tx, rx) = channel();
 
@@ -45,18 +67,21 @@ fn watch_for_write(file_path: &String) -> notify::Result<()> {
             Ok(event) => match event {
                 DebouncedEvent::Write(ref _path) => {
                     // Check file on any completed write.
-                    type_check_file(file_path);
+                    // Type check initial input file.
+                    match ast::parse_file_into_ast(file_path) {
+                        Ok(ast) => {
+                            let (insert_set, delete_set) = ast::get_diff_node_set(&ast, prev_ast);
+                            ddlog_interface::run_ddlog_type_checker(
+                                &hddlog, insert_set, delete_set,
+                            );
+                            // TO-DO: understand lifetimes and borrowing better so I can change prev_ast here.
+                        }
+                        Err(_) => (),
+                    }
                 }
                 _ => {}
             },
             Err(e) => println!("error: {:?}", e),
         }
-    }
-}
-
-fn type_check_file(file_path: &String) {
-    match ast::parse_file_into_ast(file_path) {
-        Ok(ast) => ast.pretty_print(),
-        Err(_) => (),
     }
 }

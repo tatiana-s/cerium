@@ -2,6 +2,8 @@ extern crate clang;
 // extern crate strum;
 // extern crate strum_macros;
 
+use std::collections::HashSet;
+
 use clang::*;
 // use strum_macros::{EnumDiscriminants};
 
@@ -154,5 +156,24 @@ pub fn parse_file_into_ast(file_path: &String) -> Result<AstNode, AstError> {
     }
 }
 
+fn initial_id_allocation() {}
+
+// Flattens AST by allocating IDs (and linking through them).
+// Then converts into a set of nodes (which are at this point equivalent to relations).
+pub fn get_initial_node_set(ast: &AstNode) -> HashSet<NodeKind> {
+    initial_id_allocation();
+    HashSet::new()
+}
+
+// Finds the differences between the to ASTs and flattens.
+// Here IDs are allocated in a way that unchanged nodes retain their previous IDs.
+pub fn get_diff_node_set(
+    ast: &AstNode,
+    prev_ast: &AstNode,
+) -> (HashSet<NodeKind>, HashSet<NodeKind>) {
+    (HashSet::new(), HashSet::new())
+}
+
+// TO-DO: unit and integration testing...
 #[cfg(test)]
 mod tests {}
