@@ -8,4 +8,6 @@ edition = "2021"
 
 [dependencies]
 notify = "4.0.16"
-lang-c = "*"
+clang = "1.0.3"
+strum = "0.23"
+strum_macros = "0.23"

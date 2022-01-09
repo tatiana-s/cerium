@@ -1,4 +1,3 @@
-extern crate lang_c;
 extern crate notify;
 
 // General imports.
@@ -9,11 +8,6 @@ use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
-// Imports for C parser.
-use lang_c::driver::{parse, Config};
-use lang_c::print::Printer;
-use lang_c::visit::Visit;
-
 // Modules.
 mod ast;
 mod ddlog_interface;
@@ -21,6 +15,7 @@ mod ddlog_interface;
 fn main() {
     // Read command line arguments.
     // Arguments can't contain invalid unicode characters.
+    // TO-DO: support for argument options.
     let args: Vec<String> = env::args().collect();
     let file_path = &args[1];
 
@@ -60,16 +55,8 @@ fn watch_for_write(file_path: &String) -> notify::Result<()> {
 }
 
 fn type_check_file(file_path: &String) {
-    // Create parser.
-    // TO-DO: don't create new on each parse.
-    let config = Config::default();
-    let parse_output = parse(&config, file_path);
-    match parse_output {
-        Ok(parse) => {
-            let s = &mut String::new();
-            Printer::new(s).visit_translation_unit(&parse.unit);
-            println!("{}", s);
-        }
-        Err(e) => println!("error: {:?}", e),
+    match ast::parse_file_into_ast(file_path) {
+        Ok(ast) => ast.pretty_print(),
+        Err(_) => (),
     }
 }
