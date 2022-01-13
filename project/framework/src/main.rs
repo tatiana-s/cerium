@@ -30,8 +30,8 @@ fn main() {
     let mut prev_ast: Option<ast::AstNode> = None;
     match ast::parse_file_into_ast(file_path) {
         Ok(ast) => {
-            let insert_set: HashSet<ast::NodeKind> = ast::get_initial_node_set(&ast);
-            let delete_set: HashSet<ast::NodeKind> = HashSet::new();
+            let insert_set: HashSet<ast::AstRelation> = ast::get_initial_relation_set(&ast);
+            let delete_set: HashSet<ast::AstRelation> = HashSet::new();
             ddlog_interface::run_ddlog_type_checker(&hddlog, insert_set, delete_set);
             prev_ast = Some(ast);
         }
@@ -70,7 +70,8 @@ fn watch_for_write(
                     // Type check initial input file.
                     match ast::parse_file_into_ast(file_path) {
                         Ok(ast) => {
-                            let (insert_set, delete_set) = ast::get_diff_node_set(&ast, prev_ast);
+                            let (insert_set, delete_set) =
+                                ast::get_diff_relation_set(&ast, prev_ast);
                             ddlog_interface::run_ddlog_type_checker(
                                 &hddlog, insert_set, delete_set,
                             );

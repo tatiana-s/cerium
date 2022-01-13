@@ -14,8 +14,8 @@ use crate::ast;
 
 pub fn run_ddlog_type_checker(
     hddlog: &HDDlog,
-    insert_set: HashSet<ast::NodeKind>,
-    delete_set: HashSet<ast::NodeKind>,
+    insert_set: HashSet<ast::AstRelation>,
+    delete_set: HashSet<ast::AstRelation>,
 ) {
     hddlog.transaction_start();
     // TO-DO: Convert set of updates to relations and insert/delete.

@@ -13,7 +13,7 @@ type ID = u32;
 // Defines the permitted language constructs.
 #[derive(Debug)]
 // #[derive(EnumDiscriminants)]
-pub enum NodeKind {
+pub enum AstRelation {
     TranslationUnit {
         id: ID,
         body_ids: Vec<ID>,
@@ -77,18 +77,18 @@ pub enum AstError {
 
 // Building block of AST.
 // -> ID for flattening into Datalog relations.
-// -> NodeKind for kind of AST node.
+// -> AstRelation for kind of AST node.
 // -> Location for location in input file.
 // -> Children for link to other nodes in AST.
 pub struct AstNode {
     node_id: ID,
-    node_kind: NodeKind,
+    node_kind: AstRelation,
     location: Location,
     children: Vec<AstNode>,
 }
 
 impl AstNode {
-    pub fn new(node_kind: NodeKind, location: Location) -> AstNode {
+    pub fn new(node_kind: AstRelation, location: Location) -> AstNode {
         AstNode {
             node_id: 0,
             node_kind: node_kind,
@@ -103,12 +103,12 @@ impl AstNode {
         let location = Location {};
         let node_kind = get_node_kind(clang_entity);
         match node_kind {
-            NodeKind::NotSupported => return None,
+            AstRelation::NotSupported => return None,
             _ => return Some(AstNode::new(node_kind, location)),
         }
     }
 
-    fn add_child(&mut self, node_type: NodeKind, location: Location) {
+    fn add_child(&mut self, node_type: AstRelation, location: Location) {
         self.children.push(AstNode::new(node_type, location));
     }
 
@@ -121,14 +121,25 @@ impl AstNode {
     }
 }
 
-fn get_node_kind(clang_entity: Entity) -> NodeKind {
+fn get_node_kind(clang_entity: Entity) -> AstRelation {
     let clang_kind = clang_entity.get_kind();
     match clang_kind {
-        EntityKind::TranslationUnit => NodeKind::TranslationUnit {
+        EntityKind::TranslationUnit => AstRelation::TranslationUnit {
             id: 0,
             body_ids: vec![],
         },
-        _ => NodeKind::NotSupported,
+        EntityKind::FunctionDecl => AstRelation::FunctionDef {
+            id: 0,
+            fun_name: String::new(),
+            return_id: 0,
+            arg_ids: vec![],
+        },
+        EntityKind::CallExpr => AstRelation::FunctionCall {
+            id: 0,
+            fun_id: 0,
+            arg_ids: vec![],
+        },
+        _ => AstRelation::NotSupported,
     }
 }
 
@@ -160,17 +171,20 @@ fn initial_id_allocation() {}
 
 // Flattens AST by allocating IDs (and linking through them).
 // Then converts into a set of nodes (which are at this point equivalent to relations).
-pub fn get_initial_node_set(ast: &AstNode) -> HashSet<NodeKind> {
+pub fn get_initial_relation_set(ast: &AstNode) -> HashSet<AstRelation> {
     initial_id_allocation();
     HashSet::new()
 }
 
+fn compute_tree_diff() {}
+
 // Finds the differences between the to ASTs and flattens.
 // Here IDs are allocated in a way that unchanged nodes retain their previous IDs.
-pub fn get_diff_node_set(
+pub fn get_diff_relation_set(
     ast: &AstNode,
     prev_ast: &AstNode,
-) -> (HashSet<NodeKind>, HashSet<NodeKind>) {
+) -> (HashSet<AstRelation>, HashSet<AstRelation>) {
+    compute_tree_diff();
     (HashSet::new(), HashSet::new())
 }
 
