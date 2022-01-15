@@ -11,6 +11,8 @@ clang = "1.0.3"
 strum = "0.23"
 strum_macros = "0.23"
 # Dependencies for generated DDlog library.
-differential_datalog = { path = "../type_checker_ddlog/differential_datalog"}
-type_checker = { path = "../type_checker_ddlog"}
-types = { path = "../type_checker_ddlog/types"}
+differential_datalog = { path = "../type_checker_ddlog/differential_datalog" }
+type_checker = { path = "../type_checker_ddlog" }
+types = { path = "../type_checker_ddlog/types" }
+# Dependencies for enum conversion macros.
+convert_variant_derive = { path = "./convert_variant_derive" }

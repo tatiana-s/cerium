@@ -15,6 +15,7 @@ use differential_datalog::api::HDDlog;
 // Modules.
 pub mod ast;
 pub mod ddlog_interface;
+pub mod definitions;
 
 fn main() {
     // Read command line arguments.
@@ -30,8 +31,8 @@ fn main() {
     let mut prev_ast: Option<ast::AstNode> = None;
     match ast::parse_file_into_ast(file_path) {
         Ok(ast) => {
-            let insert_set: HashSet<ast::AstRelation> = ast::get_initial_relation_set(&ast);
-            let delete_set: HashSet<ast::AstRelation> = HashSet::new();
+            let insert_set: HashSet<definitions::AstRelation> = ast::get_initial_relation_set(&ast);
+            let delete_set: HashSet<definitions::AstRelation> = HashSet::new();
             ddlog_interface::run_ddlog_type_checker(&hddlog, insert_set, delete_set);
             prev_ast = Some(ast);
         }
