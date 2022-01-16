@@ -22,8 +22,9 @@ pub enum AstRelation {
     FunDef {
         id: ID,
         fun_name: String,
-        return_id: ID,
+        return_type_id: ID,
         arg_ids: Vec<ID>,
+        body_id: ID,
     },
     // Statements.
     FunCall {
@@ -32,6 +33,7 @@ pub enum AstRelation {
         arg_ids: Vec<ID>,
     },
     Compound {
+        id: ID,
         body_ids: Vec<ID>,
     },
     Assign {
@@ -47,12 +49,17 @@ pub enum AstRelation {
     BinaryOp {
         id: ID,
         arg1_id: ID,
-        ar2_id: ID,
+        arg2_id: ID,
     },
     // Values.
     Var {
         id: ID,
         var_name: String,
+    },
+    Arg {
+        id: ID,
+        var_name: String,
+        type_id: ID,
     },
     // Leaf types.
     Void {

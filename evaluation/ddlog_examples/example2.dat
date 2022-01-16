@@ -1,0 +1,26 @@
+start;
+
+insert TransUnit(1, [2, 12]),
+insert FunDef(2, "addTwo", 3, [4], 5),
+insert Int(3),
+insert Arg(4, "a", 20),
+insert Int(20),
+insert Compound(5, [6, 7]),
+insert Assign(6, "b", 8),
+insert Int(8),
+insert Return(7, 9),
+insert BinaryOp(9, 10, 11),
+insert Var(10, "a"),
+insert Var(11, "b"),
+insert FunDef(12, "main", 13, [14], 15),
+insert Int(13),
+insert Arg(14, "", 21),
+insert Void(21),
+insert Compound(15, [16, 17]),
+insert FunCall(16, "addTwo", [18]),
+insert Int(18),
+insert Return(17, 19),
+insert Int(19);
+
+echo OkProgram:;
+dump OkProgram;

@@ -9,13 +9,14 @@ typedef Type = OkType
 
 // Direct mapping to AST relations defined in framework.
 input relation TransUnit(id: ID, body_ids: Vec<ID>)
-input relation FunDef(id: ID, fun_name: string, return_id: ID, arg_ids: Vec<ID>)
+input relation FunDef(id: ID, fun_name: string, return_type_id: ID, arg_ids: Vec<ID>, body_id: ID)
 input relation FunCall(id: ID, fun_name: string, arg_ids: Vec<ID>)
-input relation Compound(body_ids: Vec<ID>)
+input relation Compound(id: ID, body_ids: Vec<ID>)
 input relation Assign(id: ID, var_name: string, expr_id: ID)
 input relation Return(id: ID, expr_id: ID)
-input relation BinaryOp(id: ID, arg1_id: ID, ar2_id: ID)
+input relation BinaryOp(id: ID, arg1_id: ID, arg2_id: ID)
 input relation Var(id: ID, var_name: string)
+input relation Arg(id: ID, var_name: string, type_id: ID)
 input relation Void(id: ID)
 input relation Int(id: ID)
 input relation Float(id: ID)

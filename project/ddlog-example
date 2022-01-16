@@ -1,0 +1,1 @@
+./type_checker_ddlog/target/release/type_checker_cli < ../evaluation/ddlog_examples/example2.dat
