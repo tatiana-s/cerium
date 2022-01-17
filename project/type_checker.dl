@@ -1,17 +1,14 @@
 typedef ID = signed<32>
-typedef Type = OkType
-             | ErrorType
-             | VoidType 
+typedef Type = VoidType 
              | IntType 
              | FloatType 
              | CharType
-             | FunType
 
 // Direct mapping to AST relations defined in framework.
 input relation TransUnit(id: ID, body_ids: Vec<ID>)
 input relation FunDef(id: ID, fun_name: string, return_type_id: ID, arg_ids: Vec<ID>, body_id: ID)
 input relation FunCall(id: ID, fun_name: string, arg_ids: Vec<ID>)
-input relation Compound(id: ID, body_ids: Vec<ID>)
+input relation Compound(id: ID, body_ids: Vec<ID>, return_id: ID)
 input relation Assign(id: ID, var_name: string, expr_id: ID)
 input relation Return(id: ID, expr_id: ID)
 input relation BinaryOp(id: ID, arg1_id: ID, arg2_id: ID)
@@ -22,11 +19,113 @@ input relation Int(id: ID)
 input relation Float(id: ID)
 input relation Char(id: ID)
 
-// Main output relation.
+// Main output relations (intermediate relations specified in place).
+output relation Program(id: ID)
 output relation OkProgram(id: ID)
-// Secondary output relations.
-output relation TypedTransUnit(id: ID, t: Type)
 
 // Typing rules.
+Program(id) :-
+    TransUnit(id, _).
+
+
+// A translation unit is well-typed if all declarations in it are well-typed.
+relation TypedTransUnit(id: ID)
+relation ErrorTransUnit(id: ID)
+
 OkProgram(id) :-
-    TypedTransUnit(id, OkType).
+    TypedTransUnit(id).
+
+TypedTransUnit(id) :-
+    TransUnit(id, _),
+    not ErrorTransUnit(id).
+
+ErrorTransUnit(id) :-
+    TransUnit(id, body_ids),
+    var body_id = FlatMap(body_ids),
+    not TypedDeclaration(body_id).
+
+
+// Only function definitions are declarations at the moment.
+// A function definition is well typed if the compound statement block is well-typed
+// + the return statement type matches the function return type (if there is no return the type is void).
+// TO-DO: what about arguments?
+relation TypedDeclaration(id: ID)
+relation TypedFunDef(id: ID)
+
+TypedDeclaration(id) :-
+    TypedFunDef(id).
+
+TypedFunDef(id) :-
+    FunDef(id, fun_name, return_type_id, arg_ids, body_id),
+    TypedCompound(body_id, return_type_id).
+
+
+// A compound not well-typed if either the return types don't match or one of the statements inside isn't well-typed.
+relation TypedCompound(id: ID, fun_return_type_id: ID)
+relation ErrorCompound(id: ID)
+
+TypedCompound(id, fun_return_type_id) :-
+    Compound(id, body_ids, return_id),
+    TypesMatch(fun_return_type_id, return_id),
+    not ErrorCompound(id).
+
+ErrorCompound(id) :-
+    Compound(id, body_ids, _),
+    var body_id = FlatMap(body_ids),
+    not TypedStatement(body_id).
+
+
+// Different types of statements: Assign, Return, FunCall (that might ignore return), Compound.
+relation TypedStatement(id: ID)
+relation TypedReturn(id: ID, t: Type)
+
+// NOT DONE
+TypedStatement(id) :-
+    Assign(id, _, _).
+
+TypedStatement(id) :-
+    TypedReturn(id, _).
+
+TypedReturn(id, t) :-
+    Return(id, expr_id),
+    TypedExpr(expr_id, t).
+
+// NOT DONE (tricky case)
+TypedStatement(id) :-
+    FunCall(id, _, _).
+
+
+// Different types of expressions: leaf types (already handled by general typing relation).
+relation TypedExpr(id: ID, t: Type)
+relation TypedLiteral(id: ID, t: Type)
+
+TypedExpr(id, t) :-
+    TypedLiteral(id, t).
+
+// NOT DONE (tricky case)
+TypedExpr(id, VoidType) :-
+    Var(id, _).
+
+// NOT DONE
+TypedExpr(id, VoidType) :-
+    BinaryOp(id, _, _).
+
+// Leaf types (literals).
+TypedLiteral(id, VoidType) :- Void(id).
+TypedLiteral(id, IntType) :- Int(id).
+TypedLiteral(id, FloatType) :- Float(id).
+TypedLiteral(id, CharType) :- Char(id).
+
+
+// General typing rule (recursively find the type of any construct that doesn't just have the Ok type).
+relation Typed(id: ID, t: Type)
+relation TypesMatch(id1: ID, id2: ID)
+
+Typed(id, t) :- TypedLiteral(id, t).
+Typed(id, t) :- TypedReturn(id, t).
+
+// Rule for seeing if types match.
+TypesMatch(id1, id2) :-
+    Typed(id1, t1),
+    Typed(id2, t2),
+    t1 == t2.

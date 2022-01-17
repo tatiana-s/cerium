@@ -35,6 +35,7 @@ pub enum AstRelation {
     Compound {
         id: ID,
         body_ids: Vec<ID>,
+        return_id: ID,
     },
     Assign {
         id: ID,
