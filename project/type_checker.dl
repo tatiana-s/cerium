@@ -8,8 +8,10 @@ typedef Type = VoidType
 input relation TransUnit(id: ID, body_ids: Vec<ID>)
 input relation FunDef(id: ID, fun_name: string, return_type_id: ID, arg_ids: Vec<ID>, body_id: ID)
 input relation FunCall(id: ID, fun_name: string, arg_ids: Vec<ID>)
-input relation Compound(id: ID, body_ids: Vec<ID>, return_id: ID)
-input relation Assign(id: ID, var_name: string, expr_id: ID)
+input relation Compound(id: ID, start_id: ID)
+input relation Item(id: ID, stmt_id: ID, next_stmt_id: ID)
+input relation EndItem(id: ID, stmt_id: ID)
+input relation Assign(id: ID, var_name: string, type_id: ID, expr_id: ID)
 input relation Return(id: ID, expr_id: ID)
 input relation BinaryOp(id: ID, arg1_id: ID, arg2_id: ID)
 input relation Var(id: ID, var_name: string)
@@ -27,19 +29,19 @@ output relation OkProgram(id: ID)
 Program(id) :-
     TransUnit(id, _).
 
-
+// TO-DO: Remove output before every intermediate relation in final version (add for debugging purposes).
 // A translation unit is well-typed if all declarations in it are well-typed.
-relation TypedTransUnit(id: ID)
-relation ErrorTransUnit(id: ID)
+output relation TypedTransUnit(id: ID)
+output relation BodyErrorTransUnit(id: ID)
 
 OkProgram(id) :-
     TypedTransUnit(id).
 
 TypedTransUnit(id) :-
     TransUnit(id, _),
-    not ErrorTransUnit(id).
+    not BodyErrorTransUnit(id).
 
-ErrorTransUnit(id) :-
+BodyErrorTransUnit(id) :-
     TransUnit(id, body_ids),
     var body_id = FlatMap(body_ids),
     not TypedDeclaration(body_id).
@@ -48,68 +50,97 @@ ErrorTransUnit(id) :-
 // Only function definitions are declarations at the moment.
 // A function definition is well typed if the compound statement block is well-typed
 // + the return statement type matches the function return type (if there is no return the type is void).
-// TO-DO: what about arguments?
-relation TypedDeclaration(id: ID)
-relation TypedFunDef(id: ID)
+output relation TypedDeclaration(id: ID)
+output relation TypedFunDef(id: ID)
 
 TypedDeclaration(id) :-
     TypedFunDef(id).
 
 TypedFunDef(id) :-
     FunDef(id, fun_name, return_type_id, arg_ids, body_id),
-    TypedCompound(body_id, return_type_id).
+    TypedLiteral(return_type_id, return_type),
+    TypedCompound(body_id, return_type).
 
 
 // A compound not well-typed if either the return types don't match or one of the statements inside isn't well-typed.
-relation TypedCompound(id: ID, fun_return_type_id: ID)
-relation ErrorCompound(id: ID)
+// The compund needs to check all all statements in sequence (all returns need to match, there can be multiple).
+output relation TypedCompound(id: ID, fun_return_type_id: Type)
+output relation TypedReturnItem(id: ID, return_type: Type)
+output relation TypedItem(id: ID, return_type: Type)
 
-TypedCompound(id, fun_return_type_id) :-
-    Compound(id, body_ids, return_id),
-    TypesMatch(fun_return_type_id, return_id),
-    not ErrorCompound(id).
+TypedCompound(id, fun_return_type) :-
+    Compound(id, start_id),
+    TypedLiteral(fun_return_type_id, fun_return_type),
+    TypedItem(start_id, fun_return_type).
 
-ErrorCompound(id) :-
-    Compound(id, body_ids, _),
-    var body_id = FlatMap(body_ids),
-    not TypedStatement(body_id).
+TypedItem(id, return_type) :-
+    Item(id, stmt_id, next_stmt_id),
+    TypedReturn(stmt_id, return_type),
+    TypedItem(next_stmt_id, return_type).
+
+TypedItem(id, VoidType) :-
+    EndItem(id, stmt_id),
+    TypedReturn(stmt_id, return_type).
+
+TypedItem(id, return_type) :-
+    Item(id, stmt_id, next_stmt_id),
+    TypedStatement(stmt_id),
+    TypedItem(next_stmt_id, return_type).
+
+TypedItem(id, VoidType) :-
+    EndItem(id, stmt_id),
+    TypedStatement(stmt_id).
 
 
-// Different types of statements: Assign, Return, FunCall (that might ignore return), Compound.
-relation TypedStatement(id: ID)
-relation TypedReturn(id: ID, t: Type)
+// Different types of statements: Assign, Return.
+// Return has a type so it can be checked against function return types.
+// TO-DO: add compound for scopes (will be needed for control flow anyway I think).
+// Additionally any expression can be a statement.
+output relation TypedStatement(id: ID)
+output relation TypedReturn(id: ID, t: Type)
 
-// NOT DONE
 TypedStatement(id) :-
-    Assign(id, _, _).
+    Assign(id, _, type_id, expr_id), 
+    TypesMatch(type_id, expr_id).
 
 TypedStatement(id) :-
-    TypedReturn(id, _).
+    TypedExpr(id, _).
 
 TypedReturn(id, t) :-
     Return(id, expr_id),
     TypedExpr(expr_id, t).
 
-// NOT DONE (tricky case)
-TypedStatement(id) :-
-    FunCall(id, _, _).
 
-
-// Different types of expressions: leaf types (already handled by general typing relation).
-relation TypedExpr(id: ID, t: Type)
-relation TypedLiteral(id: ID, t: Type)
+// Different types of expressions: literals, variables, function calls, binary operators.
+output relation TypedExpr(id: ID, t: Type)
+output relation TypedLiteral(id: ID, t: Type)
+output relation ArithmeticType(id: ID, t: Type)
 
 TypedExpr(id, t) :-
     TypedLiteral(id, t).
 
-// NOT DONE (tricky case)
-TypedExpr(id, VoidType) :-
-    Var(id, _).
+TypedExpr(id, t) :-
+    Var(id, var_name),
+    FindVarBinding(id, var_name, t).
 
 // NOT DONE
-TypedExpr(id, VoidType) :-
-    BinaryOp(id, _, _).
+// need to check that arguments type check!
+TypedExpr(id, return_type) :-
+    FunCall(id, fun_name, args_id),
+    FindFunBinding(id, fun_name, return_type, arg_type_id).
 
+TypedExpr(id, t) :-
+    BinaryOp(id, arg1_id, arg2_id),
+    ArithmeticType(arg1_id, t),
+    ArithmeticType(arg2_id, t).
+
+// Check if integer/float operations can be performed.
+ArithmeticType(id, IntType) :-
+    TypedExpr(id, IntType).
+
+ArithmeticType(id, FloatType) :-
+    TypedExpr(id, FloatType).
+    
 // Leaf types (literals).
 TypedLiteral(id, VoidType) :- Void(id).
 TypedLiteral(id, IntType) :- Int(id).
@@ -117,15 +148,110 @@ TypedLiteral(id, FloatType) :- Float(id).
 TypedLiteral(id, CharType) :- Char(id).
 
 
-// General typing rule (recursively find the type of any construct that doesn't just have the Ok type).
-relation Typed(id: ID, t: Type)
-relation TypesMatch(id1: ID, id2: ID)
+// Context lookup relations.
+output relation FindVarBinding(current_id: ID, var_name: string, t: Type)
+output relation FindArgVarBinding(current_id: ID, var_name: string, t: Type)
+output relation FindFunBinding(current_id: ID, fun_name: string, return_type: Type, arg_type_ids: Vec<ID>)
 
-Typed(id, t) :- TypedLiteral(id, t).
-Typed(id, t) :- TypedReturn(id, t).
+// Check any parent term the variable could appear in until you reach an assignment or argument declaration with matching name.
+// (Basically performs a search up the abstract syntax tree).
+
+// Case: found assignment and names match.
+// (We just take the declared type as given since the expression will be type checked at some point anyway).
+FindVarBinding(id, var_name_found, t) :-
+    Assign(id, var_name_found, type_id, expr_id),
+    TypedLiteral(type_id, t).
+
+// Case: found function definition so need to check arguments.
+FindVarBinding(id, var_name, t) :-
+    FunDef(_, _, _, arg_ids, id),
+    var next_id = FlatMap(arg_ids),
+    FindArgVarBinding(next_id, var_name, t).
+
+// Case: found in argument declaration and names match.
+FindArgVarBinding(id, var_name_found, t) :-
+    Arg(id, var_name_found, type_id),
+    TypedLiteral(type_id, t).
+
+// Case: just continue searching.
+// -> var can be part of an arithmetic expression.
+FindVarBinding(id, var_name, t) :-
+    BinaryOp(next_id, id, arg2_id),
+    FindVarBinding(next_id, var_name, t).
+
+FindVarBinding(id, var_name, t) :-
+    BinaryOp(next_id, arg1_id, id),
+    FindVarBinding(next_id, var_name, t).
+
+// -> var can be in a return statement.
+FindVarBinding(id, var_name, t) :-
+    Return(next_id, id),
+    FindVarBinding(next_id, var_name, t).
+
+// -> var can be inside a compound item (either check inside or check previous item if there exist one).
+FindVarBinding(id, var_name, t) :-
+    Compound(next_id, id),
+    FindVarBinding(next_id, var_name, t).
+
+FindVarBinding(id, var_name, t) :-
+    Item(next_id, id, _),
+    FindVarBinding(next_id, var_name, t).
+
+FindVarBinding(id, var_name, t) :-
+    EndItem(next_id, id),
+    FindVarBinding(next_id, var_name, t).
+
+FindVarBinding(id, var_name, t) :-
+    Item(_, next_id, id),
+    FindVarBinding(next_id, var_name, t).
+
+// Similar approach for finding function definitions (since we don't have higher-order functions).
+// At the moment functions are only defined in one possible position (declarations inside a translation unit) which makes the search a bit easier.
+// (funcall -> item -> ... -> compound -> fun def (found if recursive) = declaration -> trans unit -> check all fun def declarations).
+// Case: continue searching.
+FindFunBinding(id, fun_name, return_type, arg_type_ids) :- 
+    Item(next_id, id, _),
+    FindFunBinding(next_id, fun_name, return_type, arg_type_ids).
+
+FindFunBinding(id, fun_name, return_type, arg_type_ids) :- 
+    Item(next_id, _, id),
+    FindFunBinding(next_id, fun_name, return_type, arg_type_ids).
+
+FindFunBinding(id, fun_name, return_type, arg_type_ids) :- 
+    EndItem(next_id, id),
+    FindFunBinding(next_id, fun_name, return_type, arg_type_ids).
+
+FindFunBinding(id, fun_name, return_type, arg_type_ids) :- 
+    Compound(next_id, id),
+    FindFunBinding(next_id, fun_name, return_type, arg_type_ids).
+
+FindFunBinding(id, fun_name, return_type, arg_type_ids) :- 
+    FunDef(next_id, _, _, _, id),
+    FindFunBinding(next_id, fun_name, return_type, arg_type_ids).
+
+// Case: recursive function.
+FindFunBinding(id, fun_name, return_type, arg_type_ids) :- 
+    FunDef(_, fun_name, return_type_id, arg_type_ids, id),
+    TypedLiteral(return_type_id, return_type).
+
+// Case: need to search for definition in translation unit.
+FindFunBinding(id, fun_name, return_type, arg_type_ids) :- 
+    TransUnit(id, body_ids),
+    var next_id = FlatMap(body_ids),
+    FindFunBinding(next_id, fun_name, return_type, arg_type_ids).
+
+// Case: found right function.
+FindFunBinding(id, fun_name, return_type, arg_type_ids) :- 
+    FunDef(id, fun_name, return_type_id, arg_type_ids, _),
+    TypedLiteral(return_type_id, return_type).
+
+
+// Helper relations.
+// TO-DO: review whether these are necessary/convinient or it could just be inlined.
+relation TypesMatch(id1: ID, id2: ID)
 
 // Rule for seeing if types match.
 TypesMatch(id1, id2) :-
-    Typed(id1, t1),
-    Typed(id2, t2),
-    t1 == t2.
+    TypedExpr(id1, t),
+    TypedExpr(id2, t).
+       

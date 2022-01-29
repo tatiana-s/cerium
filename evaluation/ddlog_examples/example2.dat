@@ -1,27 +1,42 @@
 start;
 
-insert TransUnit(1, [2, 12]),
-insert FunDef(2, "addTwo", 3, [4], 5),
+insert TransUnit(1, [2, 16]),
+insert FunDef(2, "addTwo", 3, [4], 6),
 insert Int(3),
-insert Arg(4, "a", 20),
-insert Int(20),
-insert Compound(5, [6, 7], 7),
-insert Assign(6, "b", 8),
-insert Int(8),
-insert Return(7, 9),
-insert BinaryOp(9, 10, 11),
-insert Var(10, "a"),
-insert Var(11, "b"),
-insert FunDef(12, "main", 13, [14], 15),
-insert Int(13),
-insert Arg(14, "", 21),
-insert Void(21),
-insert Compound(15, [16, 17], 17),
-insert FunCall(16, "addTwo", [18]),
-insert Int(18),
-insert Return(17, 19),
-insert Int(19);
+insert Arg(4, "a", 5),
+insert Int(5),
+insert Compound(6, 7),
+insert Item(7, 8, 11),
+insert Assign(8, "b", 9, 10),
+insert Int(9),
+insert Int(10),
+insert EndItem(11, 12),
+insert Return(12, 13),
+insert BinaryOp(13, 14, 15),
+insert Var(14, "a"),
+insert Var(15, "b"),
+insert FunDef(16, "main", 17, [18], 20),
+insert Int(17),
+insert Arg(18, "", 19),
+insert Void(19),
+insert Compound(20, 21),
+insert Item(21, 22, 24),
+insert FunCall(22, "addTwo", [23]),
+insert Int(23),
+insert EndItem(24, 25),
+insert Return(25, 26),
+insert Int(26);
 
 commit;
 
+dump Program;
 dump OkProgram;
+dump TypedTransUnit;
+dump BodyErrorTransUnit;
+dump TypedDeclaration;
+dump TypedFunDef;
+dump TypedCompound;
+dump TypedItem;
+dump FindVarBinding;
+dump FindArgVarBinding;
+dump FindFunBinding;

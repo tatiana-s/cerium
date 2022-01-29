@@ -32,19 +32,29 @@ pub enum AstRelation {
         fun_name: String,
         arg_ids: Vec<ID>,
     },
-    Compound {
-        id: ID,
-        body_ids: Vec<ID>,
-        return_id: ID,
-    },
     Assign {
         id: ID,
         var_name: String,
+        type_id: ID,
         expr_id: ID,
     },
     Return {
         id: ID,
         expr_id: ID,
+    },
+    // Items in compound to represent a sequence of statements.
+    Compound {
+        id: ID,
+        start_id: ID,
+    },
+    Item {
+        id: ID,
+        stmt_id: ID,
+        next_stmt_id: ID,
+    },
+    EndItem {
+        id: ID,
+        stmt_id: ID,
     },
     // Expressions.
     BinaryOp {
