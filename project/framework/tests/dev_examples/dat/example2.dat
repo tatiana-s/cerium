@@ -29,14 +29,12 @@ insert Int(26);
 
 commit;
 
-dump Program;
 dump OkProgram;
 dump TypedTransUnit;
 dump BodyErrorTransUnit;
-dump TypedDeclaration;
 dump TypedFunDef;
 dump TypedCompound;
 dump TypedItem;
-dump FindVarBinding;
-dump FindArgVarBinding;
+dump TypedStatement;
+dump TypedExpr;
 dump FindFunBinding;
