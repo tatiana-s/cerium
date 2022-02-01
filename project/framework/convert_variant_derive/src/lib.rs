@@ -56,7 +56,7 @@ pub fn derive_convert_to_relid(input: TokenStream) -> TokenStream {
 
 // Derives a function that pattern matches over an enum and returns a more general struct for each variant.
 // (Basically just removes path identifier.)
-#[proc_macro_derive(EquivDDValue)]
+/* #[proc_macro_derive(EquivDDValue)]
 pub fn derive_convert_to_ddvalue(input: TokenStream) -> TokenStream {
     let input: DeriveInput = parse_macro_input!(input as DeriveInput);
     let ref name = input.ident;
@@ -95,4 +95,4 @@ pub fn derive_convert_to_ddvalue(input: TokenStream) -> TokenStream {
         }
     };
     TokenStream::from(full_function)
-}
+} */

@@ -16,6 +16,7 @@ use differential_datalog::api::HDDlog;
 pub mod ast;
 pub mod ddlog_interface;
 pub mod definitions;
+pub mod parser_interface;
 
 fn main() {
     // Read command line arguments.
