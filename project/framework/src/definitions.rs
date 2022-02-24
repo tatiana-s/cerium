@@ -17,10 +17,10 @@ pub enum InternalError {
 }
 
 // Type aliases for consistency and easy changes.
-pub type ID = i32;
+pub type ID = usize;
 
 // Defines the permitted language constructs.
-#[derive(Debug, EquivRelId)]
+#[derive(Debug, EquivRelId, Clone)]
 //#[derive(EquivDDValue)]
 pub enum AstRelation {
     TransUnit {
