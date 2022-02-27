@@ -58,38 +58,50 @@ TypedDeclaration(id) :-
 
 TypedFunDef(id) :-
     FunDef(id, fun_name, return_type_id, arg_ids, body_id),
+    TypedLiteral(return_type_id, VoidType),
+    TypedCompound(body_id).
+
+TypedFunDef(id) :-
+    FunDef(id, fun_name, return_type_id, arg_ids, body_id),
     TypedLiteral(return_type_id, return_type),
-    TypedCompound(body_id, return_type).
+    TypedReturnCompound(body_id, return_type).
 
 
 // A compound not well-typed if either the return types don't match or one of the statements inside isn't well-typed.
 // The compund needs to check all all statements in sequence (all returns need to match, there can be multiple).
-output relation TypedCompound(id: ID, fun_return_type_id: Type)
+output relation TypedCompound(id: ID)
+output relation TypedItem(id: ID)
+output relation TypedReturnCompound(id: ID, fun_return_type_id: Type)
 output relation TypedReturnItem(id: ID, return_type: Type)
-output relation TypedItem(id: ID, return_type: Type)
 
-TypedCompound(id, fun_return_type) :-
+// Case: no return statement inside the compound block.
+TypedCompound(id) :-
     Compound(id, start_id),
-    TypedLiteral(fun_return_type_id, fun_return_type),
-    TypedItem(start_id, fun_return_type).
+    TypedItem(start_id).
 
-TypedItem(id, return_type) :-
-    Item(id, stmt_id, next_stmt_id),
-    TypedReturn(stmt_id, return_type),
-    TypedItem(next_stmt_id, return_type).
-
-TypedItem(id, VoidType) :-
-    EndItem(id, stmt_id),
-    TypedReturn(stmt_id, return_type).
-
-TypedItem(id, return_type) :-
+TypedItem(id) :-
     Item(id, stmt_id, next_stmt_id),
     TypedStatement(stmt_id),
-    TypedItem(next_stmt_id, return_type).
+    TypedItem(next_stmt_id).
 
-TypedItem(id, VoidType) :-
+TypedItem(id) :-
     EndItem(id, stmt_id),
     TypedStatement(stmt_id).
+
+// Case: return statement inside compound so must match with function return type.
+// For simplicity I will assume the return statement is always at the end (TO-DO: but will have to fix this later).
+TypedReturnCompound(id, fun_return_type) :-
+    Compound(id, start_id),
+    TypedReturnItem(start_id, fun_return_type).
+
+TypedReturnItem(id, fun_return_type) :-
+    Item(id, stmt_id, next_stmt_id),
+    TypedStatement(stmt_id),
+    TypedReturnItem(next_stmt_id, fun_return_type).
+
+TypedReturnItem(id, fun_return_type) :-
+    EndItem(id, stmt_id),
+    TypedReturn(stmt_id, fun_return_type).
 
 
 // Different types of statements: Assign, Return.
@@ -115,6 +127,7 @@ TypedReturn(id, t) :-
 output relation TypedExpr(id: ID, t: Type)
 output relation TypedLiteral(id: ID, t: Type)
 output relation ArithmeticType(id: ID, t: Type)
+output relation TypedArgument(id: ID, t: Type)
 
 TypedExpr(id, t) :-
     TypedLiteral(id, t).
@@ -123,11 +136,18 @@ TypedExpr(id, t) :-
     Var(id, var_name),
     FindVarBinding(id, var_name, t).
 
-// NOT DONE
-// need to check that arguments type check!
 TypedExpr(id, return_type) :-
-    FunCall(id, fun_name, args_id),
-    FindFunBinding(1, fun_name, return_type, arg_type_id).
+    FunCall(id, fun_name, call_args),
+    TransUnit(search_start_id, _),
+    FindFunBinding(search_start_id, fun_name, return_type, function_args),
+    var call_ids = FlatMap(call_args),
+    var function_ids = FlatMap(function_args),
+    TypedLiteral(call_ids, arg_types),
+    TypedArgument(function_ids, arg_types).
+
+TypedArgument(id, t) :-
+    Arg(id, _, type_id),
+    TypedLiteral(type_id, t).
 
 TypedExpr(id, t) :-
     BinaryOp(id, arg1_id, arg2_id),

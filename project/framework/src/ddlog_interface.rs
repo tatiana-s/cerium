@@ -2,7 +2,7 @@
 use differential_datalog::api::HDDlog;
 use differential_datalog::ddval::{DDValConvert, DDValue};
 use differential_datalog::program::{RelId, Update};
-use differential_datalog::{DDlog, DDlogDynamic, DDlogInventory, DeltaMap};
+use differential_datalog::{DDlog, DDlogDynamic, DeltaMap};
 use type_checker_ddlog::typedefs::ddlog_std::Vec as DDlogVec;
 use type_checker_ddlog::typedefs::*;
 use type_checker_ddlog::Relations;
@@ -14,7 +14,7 @@ use std::convert::TryFrom;
 // Internal imports.
 use crate::definitions::AstRelation;
 
-enum UpdateType {
+enum UpdateKind {
     InsertUpdate,
     DeleteUpdate,
 }
@@ -24,18 +24,35 @@ pub fn run_ddlog_type_checker(
     insert_set: HashSet<AstRelation>,
     delete_set: HashSet<AstRelation>,
 ) {
-    // TO-DO: Handle errors here instead of just unwrapping.
+    // Start transaction.
     hddlog.transaction_start().unwrap();
+    // Updates.
     let insert_updates = insert_set
         .iter()
-        .map(|x| convert_relation(x, UpdateType::InsertUpdate));
+        .map(|x| convert_relation(x, UpdateKind::InsertUpdate));
     hddlog
         .apply_updates(&mut insert_updates.into_iter())
         .unwrap();
-    let delta = hddlog.transaction_commit_dump_changes().unwrap();
-    // Comment/uncomment debug statement.
-    // dump_delta(&hddlog, &delta);
-    // TO-DO: return result back to user in some way.
+    /*     let delete_updates = delete_set
+        .iter()
+        .map(|x| convert_relation(x, UpdateKind::DeleteUpdate));
+    hddlog
+        .apply_updates(&mut delete_updates.into_iter())
+        .unwrap(); */
+    // See result.
+    // Comment/uncomment dump delta debug statement.
+    let mut delta = hddlog.transaction_commit_dump_changes().unwrap();
+    // dump_delta(&delta);
+    let ok_program = delta.get_rel(Relations::OkProgram as RelId);
+    for (_, weight) in ok_program.iter() {
+        if *weight == 1 {
+            println!("Program correctly typed ✅")
+        }
+    }
+    if ok_program.len() == 0 {
+        println!("Program typing error ❌");
+    }
+    // Stop transaction.
     hddlog.stop().unwrap();
 }
 
@@ -45,19 +62,22 @@ pub trait EquivRelId {
     fn get_equiv_relid(&self) -> Relations;
 }
 
-fn convert_relation(ast_relation: &AstRelation, update_type: UpdateType) -> Update<DDValue> {
+fn convert_relation(ast_relation: &AstRelation, update_type: UpdateKind) -> Update<DDValue> {
     match update_type {
-        InsertUpdate => Update::Insert {
+        UpdateKind::InsertUpdate => Update::Insert {
             relid: ast_relation.get_equiv_relid() as RelId,
             v: get_equiv_ddvalue(ast_relation),
         },
-        DeleteUpdate => panic!("Not implemented yet"),
+        UpdateKind::DeleteUpdate => Update::DeleteValue {
+            relid: ast_relation.get_equiv_relid() as RelId,
+            v: get_equiv_ddvalue(ast_relation),
+        },
     }
 }
 
 // See relation changes (for debugging purposes).
-fn dump_delta(ddlog: &HDDlog, delta: &DeltaMap<DDValue>) {
-    for (rel, changes) in delta.iter() {
+fn dump_delta(delta: &DeltaMap<DDValue>) {
+    for (_, changes) in delta.iter() {
         for (val, weight) in changes.iter() {
             println!("{} {:+}", val, weight);
         }

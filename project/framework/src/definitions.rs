@@ -1,9 +1,6 @@
 use crate::ddlog_interface;
-// use convert_variant_derive::EquivDDValue;
 use convert_variant_derive::EquivRelId;
-// use ddlog_interface::EquivDDValue;
 use ddlog_interface::EquivRelId;
-// use differential_datalog::ddval::{DDValConvert, DDValue};
 use type_checker_ddlog::typedefs::*;
 use type_checker_ddlog::Relations;
 

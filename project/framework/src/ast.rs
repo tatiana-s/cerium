@@ -155,7 +155,10 @@ pub fn get_diff_relation_set(
     ast: &Tree,
     prev_ast: &Tree,
 ) -> (HashSet<AstRelation>, HashSet<AstRelation>) {
-    (HashSet::new(), HashSet::new())
+    (
+        get_initial_relation_set(ast),
+        get_initial_relation_set(prev_ast),
+    )
 }
 
 #[cfg(test)]
