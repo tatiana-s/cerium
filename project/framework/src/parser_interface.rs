@@ -535,14 +535,11 @@ impl<'a> AstBuilder {
 
 #[cfg(test)]
 mod tests {
-    // use crate::definitions::AstRelation;
     use crate::parser_interface;
-    // use std::env;
 
     // Run with "cargo test print_for_debug -- --show-output".
     #[test]
     fn print_for_debug() {
-        // println!("{:?}", std::env::current_dir());
         parser_interface::parse_with_lang_c(&String::from("./tests/dev_examples/c/example2.c"));
     }
 }

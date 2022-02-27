@@ -141,20 +141,20 @@ impl AstNode {
 
 // Flattens AST and converts into a set of relations.
 pub fn get_initial_relation_set(ast: &Tree) -> HashSet<AstRelation> {
-    HashSet::new()
+    let mut relation_set: HashSet<AstRelation> = HashSet::new();
+    for node in ast.clone().arena {
+        relation_set.insert(node.relation);
+    }
+    relation_set
 }
 
-// Structural differencing.
-fn compute_tree_diff() {}
-
-// Finds the differences between the to ASTs and flattens.
+// Finds the differences between the to ASTs with structural differencing and flattens.
 // Returns separate sets for relations that need to be deleted and relations that are inserted.
 // Here IDs are allocated in a way that unchanged nodes retain their previous IDs.
 pub fn get_diff_relation_set(
     ast: &Tree,
     prev_ast: &Tree,
 ) -> (HashSet<AstRelation>, HashSet<AstRelation>) {
-    compute_tree_diff();
     (HashSet::new(), HashSet::new())
 }
 

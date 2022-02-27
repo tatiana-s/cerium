@@ -7,20 +7,11 @@ use ddlog_interface::EquivRelId;
 use type_checker_ddlog::typedefs::*;
 use type_checker_ddlog::Relations;
 
-// Helper enum for representing errors throughout the pipeline.
-// TO-DO: add messages for information.
-pub enum InternalError {
-    ParseError,
-    AstBuildError,
-    TransformError,
-    TypeError,
-}
-
 // Type aliases for consistency and easy changes.
 pub type ID = usize;
 
 // Defines the permitted language constructs.
-#[derive(Debug, EquivRelId, Clone)]
+#[derive(Debug, EquivRelId, Clone, PartialEq, Eq, Hash)]
 //#[derive(EquivDDValue)]
 pub enum AstRelation {
     TransUnit {
