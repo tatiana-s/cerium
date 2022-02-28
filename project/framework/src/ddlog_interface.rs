@@ -23,37 +23,53 @@ pub fn run_ddlog_type_checker(
     hddlog: &HDDlog,
     insert_set: HashSet<AstRelation>,
     delete_set: HashSet<AstRelation>,
-) {
+    prev_result: bool,
+) -> bool {
     // Start transaction.
     hddlog.transaction_start().unwrap();
     // Updates.
+    let delete_updates = delete_set
+        .iter()
+        .map(|x| convert_relation(x, UpdateKind::DeleteUpdate));
+    hddlog
+        .apply_updates(&mut delete_updates.into_iter())
+        .unwrap();
     let insert_updates = insert_set
         .iter()
         .map(|x| convert_relation(x, UpdateKind::InsertUpdate));
     hddlog
         .apply_updates(&mut insert_updates.into_iter())
         .unwrap();
-    /*     let delete_updates = delete_set
-        .iter()
-        .map(|x| convert_relation(x, UpdateKind::DeleteUpdate));
-    hddlog
-        .apply_updates(&mut delete_updates.into_iter())
-        .unwrap(); */
     // See result.
     // Comment/uncomment dump delta debug statement.
     let mut delta = hddlog.transaction_commit_dump_changes().unwrap();
     // dump_delta(&delta);
     let ok_program = delta.get_rel(Relations::OkProgram as RelId);
-    for (_, weight) in ok_program.iter() {
-        if *weight == 1 {
-            println!("Program correctly typed ✅")
+    let mut new_result = false;
+    if prev_result {
+        for (_, weight) in ok_program.iter() {
+            if *weight == -1 {
+                println!("Program typing error ❌");
+            }
         }
-    }
-    if ok_program.len() == 0 {
-        println!("Program typing error ❌");
+        if ok_program.len() == 0 {
+            println!("Program correctly typed ✅");
+            new_result = true;
+        }
+    } else {
+        for (_, weight) in ok_program.iter() {
+            if *weight == 1 {
+                println!("Program correctly typed ✅");
+                new_result = true;
+            }
+        }
+        if ok_program.len() == 0 {
+            println!("Program typing error ❌");
+        }
     }
     // Stop transaction.
     hddlog.stop().unwrap();
+    new_result
 }
 
 // Use a procedural macro to convert AST relations to equivalent DDlog relations.

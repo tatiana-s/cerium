@@ -1,15 +1,6 @@
 use crate::definitions::{AstRelation, ID};
 use std::collections::HashSet;
 
-// For tree differencing.
-#[derive(Debug, Clone)]
-enum Change {
-    None,
-    Added,
-    Deleted,
-    Modified,
-}
-
 // For storing information about node location (will be useful for error reporting).
 #[derive(Debug, Clone, Copy)]
 struct Location {}
@@ -48,8 +39,6 @@ impl Tree {
         }
     }
 
-    // fn update_node(&mut self, node: AstNode, node_id: ID) {}
-
     pub fn size(&self) -> usize {
         self.arena.len()
     }
@@ -76,7 +65,6 @@ impl Tree {
 struct AstNode {
     node_id: ID,
     relation: AstRelation,
-    modified: Change,
     location: Location,
     children: Vec<ID>,
     is_root: bool,
@@ -87,7 +75,6 @@ impl AstNode {
         Self {
             node_id,
             relation,
-            modified: Change::None,
             location: Location {},
             children: Vec::new(),
             is_root: false,
@@ -98,7 +85,6 @@ impl AstNode {
         Self {
             node_id,
             relation,
-            modified: Change::None,
             location: Location {},
             children: Vec::new(),
             is_root: true,
@@ -116,19 +102,6 @@ impl AstNode {
     fn is_leaf(&self) -> bool {
         self.children.len() == 0
     }
-
-    fn mark_change(&self, change: Change) -> Self {
-        Self {
-            node_id: self.node_id,
-            relation: self.relation.clone(),
-            modified: change,
-            location: self.location,
-            children: self.children.clone(),
-            is_root: self.is_root,
-        }
-    }
-
-    fn mark_change_rec(&mut self, change: Change) {}
 
     fn pretty_print(&self, indent: &String, arena: &Vec<AstNode>) {
         println!("{}{:?}", indent, self.relation);
@@ -152,13 +125,12 @@ pub fn get_initial_relation_set(ast: &Tree) -> HashSet<AstRelation> {
 // Returns separate sets for relations that need to be deleted and relations that are inserted.
 // Here IDs are allocated in a way that unchanged nodes retain their previous IDs.
 pub fn get_diff_relation_set(
-    ast: &Tree,
     prev_ast: &Tree,
+    new_ast: &Tree,
 ) -> (HashSet<AstRelation>, HashSet<AstRelation>) {
-    (
-        get_initial_relation_set(ast),
-        get_initial_relation_set(prev_ast),
-    )
+    let prev_root_index = prev_ast.find_root_index();
+    let new_root_index = new_ast.find_root_index();
+    (HashSet::new(), HashSet::new())
 }
 
 #[cfg(test)]
