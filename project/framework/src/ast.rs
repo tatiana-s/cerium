@@ -16,6 +16,10 @@ impl Tree {
         Self { arena: vec![] }
     }
 
+    pub fn get_relation_at_index(&self, index: ID) -> AstRelation {
+        self.arena[index].relation.clone()
+    }
+
     // Add node to arena (unconnected).
     pub fn add_node(&mut self, relation: AstRelation, node_id: ID) {
         self.arena.push(AstNode::new(node_id, relation));
@@ -62,7 +66,7 @@ impl Tree {
 
 // Building block of AST.
 #[derive(Debug, Clone)]
-struct AstNode {
+pub struct AstNode {
     node_id: ID,
     relation: AstRelation,
     location: Location,

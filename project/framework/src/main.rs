@@ -17,6 +17,7 @@ pub mod ast;
 pub mod ddlog_interface;
 pub mod definitions;
 pub mod parser_interface;
+pub mod standard_type_checker;
 
 fn main() {
     // Read command line arguments.
