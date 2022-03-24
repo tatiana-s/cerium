@@ -132,8 +132,6 @@ pub fn get_diff_relation_set(
     prev_ast: &Tree,
     new_ast: &Tree,
 ) -> (HashSet<AstRelation>, HashSet<AstRelation>) {
-    let prev_root_index = prev_ast.find_root_index();
-    let new_root_index = new_ast.find_root_index();
     (HashSet::new(), HashSet::new())
 }
 
