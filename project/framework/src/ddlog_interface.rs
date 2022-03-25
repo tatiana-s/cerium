@@ -9,7 +9,6 @@ use type_checker_ddlog::Relations;
 
 // General imports.
 use std::collections::HashSet;
-use std::convert::TryFrom;
 
 // Internal imports.
 use crate::definitions::AstRelation;
@@ -102,19 +101,17 @@ fn dump_delta(delta: &DeltaMap<DDValue>) {
     }
 }
 
-// Need to do some type conversion since we need ID to be usize in Rust for vector access but i32 in the DDlog code.
-// (TO-DO: maybe automate this as a macro as)
+// Need to do some type conversion to convert to DDlog vectors and relations.
+// (TO-DO: maybe automate this as a macro?)
 fn get_equiv_ddvalue(ast_relation: &AstRelation) -> DDValue {
     match ast_relation.clone() {
         AstRelation::TransUnit { id, body_ids } => {
-            let converted_id = i32::try_from(id).unwrap();
             let mut converted_body_ids: DDlogVec<i32> = DDlogVec::new();
             for vec_id in body_ids {
-                let converted_vec_id = i32::try_from(vec_id).unwrap();
-                converted_body_ids.push(converted_vec_id);
+                converted_body_ids.push(vec_id);
             }
             TransUnit {
-                id: converted_id,
+                id,
                 body_ids: converted_body_ids,
             }
             .into_ddvalue()
@@ -126,20 +123,16 @@ fn get_equiv_ddvalue(ast_relation: &AstRelation) -> DDValue {
             arg_ids,
             body_id,
         } => {
-            let converted_id = i32::try_from(id).unwrap();
-            let converted_return_id = i32::try_from(return_type_id).unwrap();
             let mut converted_arg_ids: DDlogVec<i32> = DDlogVec::new();
             for vec_id in arg_ids {
-                let converted_vec_id = i32::try_from(vec_id).unwrap();
-                converted_arg_ids.push(converted_vec_id);
+                converted_arg_ids.push(vec_id);
             }
-            let converted_body_id = i32::try_from(body_id).unwrap();
             FunDef {
-                id: converted_id,
+                id,
                 fun_name,
-                return_type_id: converted_return_id,
+                return_type_id,
                 arg_ids: converted_arg_ids,
-                body_id: converted_body_id,
+                body_id,
             }
             .into_ddvalue()
         }
@@ -148,14 +141,12 @@ fn get_equiv_ddvalue(ast_relation: &AstRelation) -> DDValue {
             fun_name,
             arg_ids,
         } => {
-            let converted_id = i32::try_from(id).unwrap();
             let mut converted_arg_ids: DDlogVec<i32> = DDlogVec::new();
             for vec_id in arg_ids {
-                let converted_vec_id = i32::try_from(vec_id).unwrap();
-                converted_arg_ids.push(converted_vec_id);
+                converted_arg_ids.push(vec_id);
             }
             FunCall {
-                id: converted_id,
+                id,
                 fun_name,
                 arg_ids: converted_arg_ids,
             }
@@ -166,113 +157,51 @@ fn get_equiv_ddvalue(ast_relation: &AstRelation) -> DDValue {
             var_name,
             type_id,
             expr_id,
-        } => {
-            let converted_id = i32::try_from(id).unwrap();
-            let converted_type_id = i32::try_from(type_id).unwrap();
-            let converted_expr_id = i32::try_from(expr_id).unwrap();
-            Assign {
-                id: converted_id,
-                var_name,
-                type_id: converted_type_id,
-                expr_id: converted_expr_id,
-            }
-            .into_ddvalue()
+        } => Assign {
+            id,
+            var_name,
+            type_id,
+            expr_id,
         }
-        AstRelation::Return { id, expr_id } => {
-            let converted_id = i32::try_from(id).unwrap();
-            let converted_expr_id = i32::try_from(expr_id).unwrap();
-            Return {
-                id: converted_id,
-                expr_id: converted_expr_id,
-            }
-            .into_ddvalue()
-        }
-        AstRelation::Compound { id, start_id } => {
-            let converted_id = i32::try_from(id).unwrap();
-            let converted_start_id = i32::try_from(start_id).unwrap();
-            Compound {
-                id: converted_id,
-                start_id: converted_start_id,
-            }
-            .into_ddvalue()
-        }
+        .into_ddvalue(),
+        AstRelation::Return { id, expr_id } => Return { id, expr_id }.into_ddvalue(),
+        AstRelation::Compound { id, start_id } => Compound { id, start_id }.into_ddvalue(),
         AstRelation::Item {
             id,
             stmt_id,
             next_stmt_id,
-        } => {
-            let converted_id = i32::try_from(id).unwrap();
-            let converted_stmt_id = i32::try_from(stmt_id).unwrap();
-            let converted_next_id = i32::try_from(next_stmt_id).unwrap();
-            Item {
-                id: converted_id,
-                stmt_id: converted_stmt_id,
-                next_stmt_id: converted_next_id,
-            }
-            .into_ddvalue()
+        } => Item {
+            id,
+            stmt_id,
+            next_stmt_id,
         }
-        AstRelation::EndItem { id, stmt_id } => {
-            let converted_id = i32::try_from(id).unwrap();
-            let converted_stmt_id = i32::try_from(stmt_id).unwrap();
-            EndItem {
-                id: converted_id,
-                stmt_id: converted_stmt_id,
-            }
-            .into_ddvalue()
-        }
+        .into_ddvalue(),
+        AstRelation::EndItem { id, stmt_id } => EndItem { id, stmt_id }.into_ddvalue(),
         AstRelation::BinaryOp {
             id,
             arg1_id,
             arg2_id,
-        } => {
-            let converted_id = i32::try_from(id).unwrap();
-            let converted_arg1_id = i32::try_from(arg1_id).unwrap();
-            let converted_arg2_id = i32::try_from(arg2_id).unwrap();
-            BinaryOp {
-                id: converted_id,
-                arg1_id: converted_arg1_id,
-                arg2_id: converted_arg2_id,
-            }
-            .into_ddvalue()
+        } => BinaryOp {
+            id,
+            arg1_id,
+            arg2_id,
         }
-        AstRelation::Var { id, var_name } => {
-            let converted_id = i32::try_from(id).unwrap();
-            Var {
-                id: converted_id,
-                var_name,
-            }
-            .into_ddvalue()
-        }
+        .into_ddvalue(),
+        AstRelation::Var { id, var_name } => Var { id, var_name }.into_ddvalue(),
         AstRelation::Arg {
             id,
             var_name,
             type_id,
-        } => {
-            let converted_id = i32::try_from(id).unwrap();
-            let converted_type_id = i32::try_from(type_id).unwrap();
-            Arg {
-                id: converted_id,
-                var_name,
-                type_id: converted_type_id,
-            }
-            .into_ddvalue()
+        } => Arg {
+            id,
+            var_name,
+            type_id,
         }
-        AstRelation::Void { id } => {
-            let converted_id = i32::try_from(id).unwrap();
-            Void { id: converted_id }.into_ddvalue()
-        }
-        AstRelation::Int { id } => {
-            let converted_id = i32::try_from(id).unwrap();
-            Int { id: converted_id }.into_ddvalue()
-        }
-        AstRelation::Float { id } => {
-            let converted_id = i32::try_from(id).unwrap();
-            Void { id: converted_id }.into_ddvalue()
-        }
-        AstRelation::Char { id } => {
-            let converted_id = i32::try_from(id).unwrap();
-            Char { id: converted_id }.into_ddvalue()
-        }
+        .into_ddvalue(),
+        AstRelation::Void { id } => Void { id }.into_ddvalue(),
+        AstRelation::Int { id } => Int { id }.into_ddvalue(),
+        AstRelation::Float { id } => Void { id }.into_ddvalue(),
+        AstRelation::Char { id } => Char { id }.into_ddvalue(),
     }
 }
 
@@ -298,7 +227,7 @@ mod tests {
     // Manual type conversion test.
     #[test]
     fn convert_fundef_to_ddvalue() {
-        let id: usize = 0;
+        let id: ID = 0;
         let fundef_relation = AstRelation::FunDef {
             id: id,
             fun_name: String::from("function"),

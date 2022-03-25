@@ -5,7 +5,7 @@ use type_checker_ddlog::typedefs::*;
 use type_checker_ddlog::Relations;
 
 // Type aliases for consistency and easy changes.
-pub type ID = usize;
+pub type ID = i32;
 
 // Defines the permitted language constructs.
 #[derive(Debug, EquivRelId, Clone, PartialEq, Eq, Hash)]
@@ -82,4 +82,24 @@ pub enum AstRelation {
     Char {
         id: ID,
     },
+}
+
+// Language constructs not including IDs (used for tree differencing).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AstNodeKind {
+    TransUnit,
+    FunDef { fun_name: String },
+    FunCall { fun_name: String },
+    Assign { var_name: String },
+    Return,
+    Compound,
+    Item,
+    EndItem,
+    BinaryOp,
+    Var { var_name: String },
+    Arg { var_name: String },
+    Void,
+    Int,
+    Float,
+    Char,
 }

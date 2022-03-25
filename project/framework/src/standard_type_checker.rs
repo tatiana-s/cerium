@@ -1,4 +1,4 @@
-use crate::ast::Tree;
+use crate::ast::RelationTree as Tree;
 use crate::definitions::{AstRelation, ID};
 use std::collections::HashMap;
 
@@ -19,15 +19,11 @@ struct FunType {
 }
 
 pub fn type_check(ast: &Tree) -> bool {
-    let root_index = ast.find_root_index();
+    let root_index = ast.get_root();
     let var_context: HashMap<String, Type> = HashMap::new();
     let fun_context: HashMap<String, FunType> = HashMap::new();
-    type_check_trans_unit(
-        ast.get_relation_at_index(root_index),
-        &ast,
-        var_context,
-        fun_context,
-    ) == Type::OkType
+    type_check_trans_unit(ast.get_relation(root_index), &ast, var_context, fun_context)
+        == Type::OkType
 }
 
 // Traverse the AST to type-check the program recursively.
@@ -42,7 +38,7 @@ fn type_check_trans_unit(
             let mut body_correct = true;
             for body_id in body_ids {
                 match type_check_fun_def(
-                    ast.get_relation_at_index(body_id),
+                    ast.get_relation(body_id),
                     ast,
                     var_context.clone(),
                     fun_context.clone(),
@@ -75,7 +71,7 @@ fn type_check_fun_def(
             arg_ids,
             body_id,
         } => {
-            let return_type = type_check_literal(&ast.get_relation_at_index(return_type_id));
+            let return_type = type_check_literal(&ast.get_relation(return_type_id));
             let (new_var_context, arg_types) = bind_arguments(arg_ids, var_context, ast);
             let mut new_fun_context = fun_context.clone();
             new_fun_context.insert(
@@ -86,7 +82,7 @@ fn type_check_fun_def(
                 },
             );
             return type_check_compound(
-                &ast.get_relation_at_index(body_id),
+                &ast.get_relation(body_id),
                 ast,
                 new_var_context,
                 new_fun_context,
@@ -105,14 +101,14 @@ fn bind_arguments(
     let mut new_var_context = var_context.clone();
     let mut arg_types = vec![];
     for arg_id in arg_ids {
-        let arg_relation = &ast.get_relation_at_index(arg_id);
+        let arg_relation = &ast.get_relation(arg_id);
         match arg_relation {
             AstRelation::Arg {
                 id: _,
                 var_name,
                 type_id,
             } => {
-                let arg_type = type_check_literal(&ast.get_relation_at_index(*type_id));
+                let arg_type = type_check_literal(&ast.get_relation(*type_id));
                 new_var_context.insert(var_name.clone(), arg_type.clone());
                 arg_types.push(arg_type);
             }
@@ -132,7 +128,7 @@ fn type_check_compound(
     match *node {
         AstRelation::Compound { id: _, start_id } => {
             return type_check_item(
-                ast.get_relation_at_index(start_id),
+                ast.get_relation(start_id),
                 ast,
                 var_context,
                 fun_context,
@@ -157,7 +153,7 @@ fn type_check_item(
             next_stmt_id,
         } => {
             match type_check_statement(
-                ast.get_relation_at_index(stmt_id),
+                ast.get_relation(stmt_id),
                 ast,
                 var_context.clone(),
                 fun_context.clone(),
@@ -165,7 +161,7 @@ fn type_check_item(
             ) {
                 (Type::OkType, new_var_context) => {
                     return type_check_item(
-                        ast.get_relation_at_index(next_stmt_id),
+                        ast.get_relation(next_stmt_id),
                         ast,
                         new_var_context,
                         fun_context,
@@ -178,7 +174,7 @@ fn type_check_item(
         }
         AstRelation::EndItem { id: _, stmt_id } => {
             return type_check_statement(
-                ast.get_relation_at_index(stmt_id),
+                ast.get_relation(stmt_id),
                 ast,
                 var_context,
                 fun_context,
@@ -205,9 +201,9 @@ fn type_check_statement(
             type_id,
             expr_id,
         } => {
-            let assign_type = type_check_literal(&ast.get_relation_at_index(type_id));
+            let assign_type = type_check_literal(&ast.get_relation(type_id));
             let (expr_type, new_var_context) = type_check_statement(
-                ast.get_relation_at_index(expr_id),
+                ast.get_relation(expr_id),
                 ast,
                 var_context.clone(),
                 fun_context.clone(),
@@ -223,7 +219,7 @@ fn type_check_statement(
         }
         AstRelation::Return { id: _, expr_id } => {
             let (expr_type, new_var_context) = type_check_statement(
-                ast.get_relation_at_index(expr_id),
+                ast.get_relation(expr_id),
                 ast,
                 var_context.clone(),
                 fun_context.clone(),
@@ -251,7 +247,7 @@ fn type_check_statement(
             let mut counter = 0;
             for arg_id in arg_ids {
                 let (arg_type, var_context) = type_check_statement(
-                    ast.get_relation_at_index(arg_id),
+                    ast.get_relation(arg_id),
                     ast,
                     var_context.clone(),
                     fun_context.clone(),
@@ -270,14 +266,14 @@ fn type_check_statement(
             arg2_id,
         } => {
             let (arg1_type, new_var_context) = type_check_statement(
-                ast.get_relation_at_index(arg1_id),
+                ast.get_relation(arg1_id),
                 ast,
                 var_context.clone(),
                 fun_context.clone(),
                 current_fun.clone(),
             );
             let (arg2_type, new_var_context) = type_check_statement(
-                ast.get_relation_at_index(arg2_id),
+                ast.get_relation(arg2_id),
                 ast,
                 new_var_context,
                 fun_context.clone(),
@@ -322,7 +318,7 @@ mod tests {
 
     #[test]
     fn check_correct_program() {
-        let ast = parser_interface::parse_file_into_ast(&String::from(
+        let ast = parser_interface::parse_file_into_initial_ast(&String::from(
             "./tests/dev_examples/c/example2.c",
         ));
         assert_eq!(type_check(&ast), true);
@@ -330,7 +326,7 @@ mod tests {
 
     #[test]
     fn check_error_program() {
-        let ast = parser_interface::parse_file_into_ast(&String::from(
+        let ast = parser_interface::parse_file_into_initial_ast(&String::from(
             "./tests/dev_examples/c/example3.c",
         ));
         assert_eq!(type_check(&ast), false);
