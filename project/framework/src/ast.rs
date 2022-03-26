@@ -23,7 +23,7 @@ impl RelationTree {
         }
     }
 
-    pub fn get_node(&mut self, index: ID) -> RelationNode {
+    pub fn get_node(&self, index: ID) -> RelationNode {
         let result = self.arena.get(&index);
         match result {
             Some(node) => node.clone(),
@@ -31,7 +31,7 @@ impl RelationTree {
         }
     }
 
-    pub fn get_relation(&mut self, index: ID) -> AstRelation {
+    pub fn get_relation(&self, index: ID) -> AstRelation {
         let result = self.arena.get(&index);
         match result {
             Some(node) => node.relation.clone(),
@@ -58,33 +58,31 @@ impl RelationTree {
 
     pub fn link_child(&mut self, node_id: ID, child_id: ID) {
         if self.arena.contains_key(&node_id) && self.arena.contains_key(&child_id) {
-            let node = self.arena.get(&node_id).unwrap();
-            node.clone().link_child(child_id);
-            self.arena.insert(node_id, node.clone());
+            self.arena.get_mut(&node_id).unwrap().link_child(child_id);
         }
     }
 
     pub fn replace_children(&mut self, node_id: ID, child_ids: Vec<ID>) {
         if self.arena.contains_key(&node_id) {
             self.arena
-                .get(&node_id)
+                .get_mut(&node_id)
                 .unwrap()
                 .replace_children(child_ids);
         }
     }
 
-    pub fn size(&mut self) -> usize {
+    pub fn size(&self) -> usize {
         self.arena.len()
     }
 
-    pub fn pretty_print(&mut self) {
+    pub fn pretty_print(&self) {
         self.arena
             .get(&self.root_id)
             .unwrap()
             .pretty_print(&String::from(""), &self.arena);
     }
 
-    pub fn get_root(&mut self) -> ID {
+    pub fn get_root(&self) -> ID {
         self.root_id
     }
 }
@@ -170,14 +168,14 @@ impl UpdateTree {
 
     pub fn link_child(&mut self, node_key: usize, child_key: usize) {
         if self.arena.contains_key(&node_key) && self.arena.contains_key(&node_key) {
-            self.arena.get(&node_key).unwrap().link_child(child_key);
+            self.arena.get_mut(&node_key).unwrap().link_child(child_key);
         }
     }
 
     pub fn replace_children(&mut self, node_key: usize, child_keys: Vec<usize>) {
         if self.arena.contains_key(&node_key) {
             self.arena
-                .get(&node_key)
+                .get_mut(&node_key)
                 .unwrap()
                 .replace_children(child_keys);
         }
@@ -252,7 +250,7 @@ pub fn get_diff_relation_set(
     prev_ast: &RelationTree,
     new_ast: &UpdateTree,
 ) -> (HashSet<AstRelation>, HashSet<AstRelation>, RelationTree) {
-    (HashSet::new(), HashSet::new(), *prev_ast)
+    (HashSet::new(), HashSet::new(), prev_ast.clone())
 }
 
 #[cfg(test)]

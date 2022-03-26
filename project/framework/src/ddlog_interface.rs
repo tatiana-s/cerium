@@ -25,8 +25,6 @@ pub fn run_ddlog_type_checker(
     prev_result: bool,
 ) -> bool {
     // Start transaction.
-    println!("{:?}", insert_set);
-    println!("{:?}", delete_set);
     hddlog.transaction_start().unwrap();
     // Updates.
     let delete_updates = delete_set
@@ -44,7 +42,7 @@ pub fn run_ddlog_type_checker(
     // See result.
     // Comment/uncomment dump delta debug statement.
     let mut delta = hddlog.transaction_commit_dump_changes().unwrap();
-    dump_delta(&delta);
+    // dump_delta(&delta);
     let ok_program = delta.get_rel(Relations::OkProgram as RelId);
     let mut new_result = false;
     if prev_result {
@@ -68,8 +66,6 @@ pub fn run_ddlog_type_checker(
             println!("Program typing error ❌");
         }
     }
-    // Stop transaction.
-    // hddlog.stop().unwrap();
     new_result
 }
 
