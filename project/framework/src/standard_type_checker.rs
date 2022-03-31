@@ -1,4 +1,4 @@
-use crate::ast::RelationTree as Tree;
+use crate::ast::Tree;
 use crate::definitions::{AstRelation, ID};
 use std::collections::HashMap;
 
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn check_correct_program() {
-        let ast = parser_interface::parse_file_into_initial_ast(&String::from(
+        let ast = parser_interface::parse_file_into_ast(&String::from(
             "./tests/dev_examples/c/example2.c",
         ));
         assert_eq!(type_check(&ast), true);
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn check_error_program() {
-        let ast = parser_interface::parse_file_into_initial_ast(&String::from(
+        let ast = parser_interface::parse_file_into_ast(&String::from(
             "./tests/dev_examples/c/example3.c",
         ));
         assert_eq!(type_check(&ast), false);

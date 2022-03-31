@@ -30,7 +30,7 @@ fn main() {
     let (hddlog, _) = type_checker_ddlog::run(1, false).unwrap();
 
     // Type check initial input file.
-    let ast = parser_interface::parse_file_into_initial_ast(file_path);
+    let ast = parser_interface::parse_file_into_ast(file_path);
     // ast.pretty_print();
     let insert_set: HashSet<definitions::AstRelation> = ast::get_initial_relation_set(&ast);
     let delete_set: HashSet<definitions::AstRelation> = HashSet::new();
@@ -46,7 +46,7 @@ fn main() {
 // Watches file for writes and passes it off to the parser in the event of one.
 fn watch_for_write(
     file_path: &String,
-    initial_ast: &ast::RelationTree,
+    initial_ast: &ast::Tree,
     hddlog: HDDlog,
     initial_result: bool,
 ) -> notify::Result<()> {
