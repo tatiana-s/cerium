@@ -1,6 +1,6 @@
 int addTwo(int a)
 {
-    char b = 2;
+    int b = 2;
     return a + b;
 }
 

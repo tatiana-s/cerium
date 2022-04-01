@@ -92,6 +92,10 @@ impl Tree {
                 .update_relation(relation);
         }
     }
+
+    pub fn delete_node(&mut self, node_id: ID) {
+        self.arena.remove(&node_id);
+    }
 }
 
 // Building block of AST.
@@ -119,10 +123,6 @@ impl AstNode {
 
     fn replace_children(&mut self, child_ids: Vec<ID>) {
         self.children = child_ids;
-    }
-
-    fn is_leaf(&self) -> bool {
-        self.children.len() == 0
     }
 
     fn pretty_print(&self, indent: &String, arena: &HashMap<ID, AstNode>) {
@@ -165,6 +165,9 @@ pub fn get_diff_relation_set(
     let mut deletion_set = HashSet::new();
     // For now we are assuming all top level declarations are function and we will identify them by names.
     // (Also assuming you are more likely to change function order rather than name).
+    let mut fun_to_be_deleted: HashMap<ID, bool> = HashMap::new();
+    // Need to check against this in the end to find functions that are completely new.
+    let mut matching_new_funs: Vec<ID> = vec![];
     for fun_id in &prev_root.children {
         match prev_ast.get_relation(*fun_id) {
             AstRelation::FunDef {
@@ -174,12 +177,13 @@ pub fn get_diff_relation_set(
                 arg_ids: prev_arg_ids,
                 body_id: prev_body_id,
             } => {
-                for new_fun_id in &new_root.children {
+                fun_to_be_deleted.insert(prev_id, true);
+                'new_search: for new_fun_id in &new_root.children {
                     let node_to_compare = new_ast.get_node(*new_fun_id);
                     match node_to_compare.relation {
                         AstRelation::FunDef {
-                            // Ignore IDs in new tree, they are just a lookup tool.
-                            id: _,
+                            // IDs here are really just a lookup tool.
+                            id: new_id,
                             fun_name: new_fun_name,
                             return_type_id: new_return_type_id,
                             arg_ids: new_arg_ids,
@@ -187,6 +191,7 @@ pub fn get_diff_relation_set(
                         } => {
                             // Case: function name matches so we keep comparing.
                             if prev_fun_name == new_fun_name {
+                                matching_new_funs.push(new_id);
                                 // Compare return type (could either match or not but will definitely be there).
                                 let prev_return_type = prev_ast.get_relation(prev_return_type_id);
                                 let new_return_type = new_ast.get_relation(new_return_type_id);
@@ -195,14 +200,15 @@ pub fn get_diff_relation_set(
                                     // Delete the current return type relation.
                                     deletion_set.insert(prev_return_type);
                                     // Change the ID in the new return type to match the previous one.
-                                    // Update the corresponding node in the tree.
-                                    updated_tree.update_relation(
+                                    let replacement = replace_id_in_relation(
+                                        &new_return_type,
                                         prev_return_type_id,
-                                        replace_id_in_relation(
-                                            &new_return_type,
-                                            prev_return_type_id,
-                                        ),
                                     );
+                                    // Update the corresponding node in the tree.
+                                    updated_tree
+                                        .update_relation(prev_return_type_id, replacement.clone());
+                                    // Insert the new relation.
+                                    insertion_set.insert(replacement);
                                 }
                                 // Compare argument types (in this case order matters).
                                 for (index, prev_arg_id) in prev_arg_ids.iter().enumerate() {
@@ -216,7 +222,10 @@ pub fn get_diff_relation_set(
                                     }
                                 }
                                 // Compare function bodies.
-                            } else {
+                                // Mark this function as not having to be completely deleted.
+                                fun_to_be_deleted.insert(prev_id, false);
+                                // Break out of the loop since we have now found a matched function.
+                                break 'new_search;
                             }
                         }
                         _ => panic!("Unexpected node during diffing"),
@@ -226,7 +235,491 @@ pub fn get_diff_relation_set(
             _ => panic!("Unexpected node during diffing"),
         }
     }
+    // Iterate over prev functions to be deleted and add result to deletion set (pass tree to be updated as well).
+    for (prev_fun_id, indicator) in fun_to_be_deleted {
+        if indicator {
+            let (deletions, new_updated_tree) = delete_onwards(prev_fun_id, updated_tree.clone());
+            updated_tree = new_updated_tree;
+            deletion_set.union(&deletions);
+        }
+    }
+    // Iterate over new functions to see which ones aren't matching and add to insertion set (tree as well).
+    for new_fun_id in &new_root.children {
+        if !matching_new_funs.contains(new_fun_id) {
+            let (insertions, new_updated_tree, inserted_fun_id) =
+                insert_onwards(*new_fun_id, updated_tree.clone(), new_ast.clone());
+            updated_tree = new_updated_tree;
+            insertion_set.union(&insertions);
+        }
+    }
+    // Return result.
     (insertion_set, deletion_set, updated_tree)
+}
+
+// Delete the node with the given ID and all its children.
+// Don't forget to unlink this node from any parents before calling this.
+fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
+    let mut delete_set: HashSet<AstRelation> = HashSet::new();
+    let relation_to_be_deleted = ast.get_relation(node_id);
+    let relation_to_be_deleted_clone = relation_to_be_deleted.clone();
+    match relation_to_be_deleted {
+        // Leaf nodes we don't have to consider any children recursively.
+        AstRelation::Char { id: _ } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            return (delete_set, ast);
+        }
+        AstRelation::Float { id: _ } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            return (delete_set, ast);
+        }
+        AstRelation::Int { id: _ } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            return (delete_set, ast);
+        }
+        AstRelation::Void { id: _ } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            return (delete_set, ast);
+        }
+        // Other nodes just recursively apply function and add result to deletion set before returning.
+        AstRelation::Arg {
+            id: _,
+            var_name: _,
+            type_id,
+        } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let (child_set, updated_ast) = delete_onwards(type_id, ast);
+            delete_set.union(&child_set);
+            return (delete_set, updated_ast);
+        }
+        AstRelation::Var { id: _, var_name: _ } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            return (delete_set, ast);
+        }
+        AstRelation::BinaryOp {
+            id: _,
+            arg1_id,
+            arg2_id,
+        } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let (child_set, updated_ast) = delete_onwards(arg1_id, ast);
+            delete_set.union(&child_set);
+            let (child_set, updated_ast) = delete_onwards(arg2_id, updated_ast);
+            delete_set.union(&child_set);
+            return (delete_set, updated_ast);
+        }
+        AstRelation::EndItem { id: _, stmt_id } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let (child_set, updated_ast) = delete_onwards(stmt_id, ast);
+            delete_set.union(&child_set);
+            return (delete_set, updated_ast);
+        }
+        AstRelation::Item {
+            id: _,
+            stmt_id,
+            next_stmt_id,
+        } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let (child_set, updated_ast) = delete_onwards(stmt_id, ast);
+            delete_set.union(&child_set);
+            let (child_set, updated_ast) = delete_onwards(next_stmt_id, updated_ast);
+            delete_set.union(&child_set);
+            return (delete_set, updated_ast);
+        }
+        AstRelation::Compound { id: _, start_id } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let (child_set, updated_ast) = delete_onwards(start_id, ast);
+            delete_set.union(&child_set);
+            return (delete_set, updated_ast);
+        }
+        AstRelation::Return { id: _, expr_id } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let (child_set, updated_ast) = delete_onwards(expr_id, ast);
+            delete_set.union(&child_set);
+            return (delete_set, updated_ast);
+        }
+        AstRelation::Assign {
+            id: _,
+            var_name: _,
+            type_id,
+            expr_id,
+        } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let (child_set, updated_ast) = delete_onwards(type_id, ast);
+            delete_set.union(&child_set);
+            let (child_set, updated_ast) = delete_onwards(expr_id, updated_ast);
+            delete_set.union(&child_set);
+            return (delete_set, updated_ast);
+        }
+        AstRelation::FunCall {
+            id: _,
+            fun_name: _,
+            arg_ids,
+        } => {
+            delete_set.insert(relation_to_be_deleted_clone);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let mut updated_ast = ast.clone();
+            for arg_id in arg_ids {
+                let (child_set, new_updated_ast) = delete_onwards(arg_id, updated_ast.clone());
+                updated_ast = new_updated_ast;
+                delete_set.union(&child_set);
+            }
+            return (delete_set, ast);
+        }
+        AstRelation::FunDef {
+            id: _,
+            fun_name: _,
+            return_type_id,
+            arg_ids,
+            body_id,
+        } => {
+            delete_set.insert(relation_to_be_deleted_clone);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let mut updated_ast = ast.clone();
+            let (child_set, new_updated_ast) = delete_onwards(return_type_id, updated_ast);
+            updated_ast = new_updated_ast;
+            delete_set.union(&child_set);
+            for arg_id in arg_ids {
+                let (child_set, new_updated_ast) = delete_onwards(arg_id, updated_ast.clone());
+                updated_ast = new_updated_ast;
+                delete_set.union(&child_set);
+            }
+            let (child_set, updated_ast) = delete_onwards(body_id, updated_ast);
+            delete_set.union(&child_set);
+            return (delete_set, updated_ast);
+        }
+        AstRelation::TransUnit { id: _, body_ids } => {
+            delete_set.insert(relation_to_be_deleted_clone);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let mut updated_ast = ast.clone();
+            for body_id in body_ids {
+                let (child_set, new_updated_ast) = delete_onwards(body_id, updated_ast);
+                updated_ast = new_updated_ast;
+                delete_set.union(&child_set);
+            }
+            return (delete_set, ast);
+        }
+    }
+}
+
+// Insert the node with the given ID and all its children.
+// Don't forget to link this node to any parents before calling this.
+// (ast = tree we are updating, new_ast = tree we get the relations to insert from.)
+// Here we need to pay attention to not confuse IDs in maintained tree vs. IDs in new tree which we don't actually care about.
+fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRelation>, Tree, ID) {
+    let mut insertion_set: HashSet<AstRelation> = HashSet::new();
+    let relation_to_be_inserted = new_ast.get_relation(node_id);
+    match relation_to_be_inserted {
+        // Leaf nodes we don't have to consider any children recursively.
+        AstRelation::Char { id: _ } => {
+            let new_id = ast.max_id + 1;
+            let new_relation = replace_id_in_relation(&relation_to_be_inserted, new_id);
+            insertion_set.insert(new_relation.clone());
+            ast.add_node(new_id, new_relation);
+            return (insertion_set, ast, new_id);
+        }
+        AstRelation::Float { id: _ } => {
+            let new_id = ast.max_id + 1;
+            let new_relation = replace_id_in_relation(&relation_to_be_inserted, new_id);
+            insertion_set.insert(new_relation.clone());
+            ast.add_node(new_id, new_relation);
+            return (insertion_set, ast, new_id);
+        }
+        AstRelation::Int { id: _ } => {
+            let new_id = ast.max_id + 1;
+            let new_relation = replace_id_in_relation(&relation_to_be_inserted, new_id);
+            insertion_set.insert(new_relation.clone());
+            ast.add_node(new_id, new_relation);
+            return (insertion_set, ast, new_id);
+        }
+        AstRelation::Void { id: _ } => {
+            let new_id = ast.max_id + 1;
+            let new_relation = replace_id_in_relation(&relation_to_be_inserted, new_id);
+            insertion_set.insert(new_relation.clone());
+            ast.add_node(new_id, new_relation);
+            return (insertion_set, ast, new_id);
+        }
+        // Other nodes have to take care with linking children correctly for both relations and nodes.
+        AstRelation::Arg {
+            id: _,
+            var_name,
+            type_id,
+        } => {
+            let (insertions, mut updated_ast, type_child_id) =
+                insert_onwards(type_id, ast, new_ast);
+            insertion_set.union(&insertions);
+            let new_id = updated_ast.max_id + 1;
+            let new_relation = AstRelation::Arg {
+                id: new_id,
+                var_name,
+                type_id: type_child_id,
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.link_child(new_id, type_child_id);
+            return (insertion_set, updated_ast, new_id);
+        }
+        AstRelation::Var { id: _, var_name } => {
+            let new_id = ast.max_id + 1;
+            let new_relation = AstRelation::Var {
+                id: new_id,
+                var_name,
+            };
+            insertion_set.insert(new_relation.clone());
+            ast.add_node(new_id, new_relation);
+            return (insertion_set, ast, new_id);
+        }
+        AstRelation::BinaryOp {
+            id: _,
+            arg1_id,
+            arg2_id,
+        } => {
+            let (insertions, updated_ast, arg1_child_id) =
+                insert_onwards(arg1_id, ast, new_ast.clone());
+            insertion_set.union(&insertions);
+            let (insertions, mut updated_ast, arg2_child_id) =
+                insert_onwards(arg2_id, updated_ast, new_ast);
+            insertion_set.union(&insertions);
+            let new_id = updated_ast.max_id + 1;
+            let new_relation = AstRelation::BinaryOp {
+                id: new_id,
+                arg1_id: arg1_child_id,
+                arg2_id: arg2_child_id,
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.link_child(new_id, arg1_child_id);
+            updated_ast.link_child(new_id, arg2_child_id);
+            return (insertion_set, updated_ast, new_id);
+        }
+        AstRelation::EndItem { id: _, stmt_id } => {
+            let (insertions, mut updated_ast, stmt_child_id) =
+                insert_onwards(stmt_id, ast, new_ast);
+            insertion_set.union(&insertions);
+            let new_id = updated_ast.max_id + 1;
+            let new_relation = AstRelation::EndItem {
+                id: new_id,
+                stmt_id: stmt_child_id,
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.link_child(new_id, stmt_child_id);
+            return (insertion_set, updated_ast, new_id);
+        }
+        AstRelation::Item {
+            id: _,
+            stmt_id,
+            next_stmt_id,
+        } => {
+            let (insertions, updated_ast, stmt_child_id) =
+                insert_onwards(stmt_id, ast, new_ast.clone());
+            insertion_set.union(&insertions);
+            let (insertions, mut updated_ast, next_stmt_child_id) =
+                insert_onwards(next_stmt_id, updated_ast, new_ast);
+            insertion_set.union(&insertions);
+            let new_id = updated_ast.max_id + 1;
+            let new_relation = AstRelation::Item {
+                id: new_id,
+                stmt_id: stmt_child_id,
+                next_stmt_id: next_stmt_child_id,
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.link_child(new_id, stmt_child_id);
+            updated_ast.link_child(new_id, next_stmt_child_id);
+            return (insertion_set, updated_ast, new_id);
+        }
+        AstRelation::Compound { id: _, start_id } => {
+            let (insertions, mut updated_ast, start_child_id) =
+                insert_onwards(start_id, ast, new_ast);
+            insertion_set.union(&insertions);
+            let new_id = updated_ast.max_id + 1;
+            let new_relation = AstRelation::Compound {
+                id: new_id,
+                start_id: start_child_id,
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.link_child(new_id, start_child_id);
+            return (insertion_set, updated_ast, new_id);
+        }
+        AstRelation::Return { id: _, expr_id } => {
+            let (insertions, mut updated_ast, expr_child_id) =
+                insert_onwards(expr_id, ast, new_ast);
+            insertion_set.union(&insertions);
+            let new_id = updated_ast.max_id + 1;
+            let new_relation = AstRelation::Return {
+                id: new_id,
+                expr_id: expr_child_id,
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.link_child(new_id, expr_child_id);
+            return (insertion_set, updated_ast, new_id);
+        }
+        AstRelation::Assign {
+            id: _,
+            var_name,
+            type_id,
+            expr_id,
+        } => {
+            let (insertions, updated_ast, type_child_id) =
+                insert_onwards(type_id, ast, new_ast.clone());
+            insertion_set.union(&insertions);
+            let (insertions, mut updated_ast, expr_child_id) =
+                insert_onwards(expr_id, updated_ast, new_ast);
+            insertion_set.union(&insertions);
+            let new_id = updated_ast.max_id + 1;
+            let new_relation = AstRelation::Assign {
+                id: new_id,
+                var_name,
+                type_id: type_child_id,
+                expr_id: expr_child_id,
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.link_child(new_id, type_child_id);
+            updated_ast.link_child(new_id, expr_child_id);
+            return (insertion_set, updated_ast, new_id);
+        }
+        AstRelation::FunCall {
+            id: _,
+            fun_name,
+            arg_ids,
+        } => {
+            let mut updated_ast = ast.clone();
+            let mut new_child_ids: Vec<ID> = vec![];
+            for arg_id in arg_ids {
+                let (insertions, new_updated_ast, arg_child_id) =
+                    insert_onwards(arg_id, updated_ast, new_ast.clone());
+                new_child_ids.push(arg_child_id);
+                updated_ast = new_updated_ast;
+                insertion_set.union(&insertions);
+            }
+            let new_id = ast.max_id + 1;
+            let new_relation = AstRelation::FunCall {
+                id: new_id,
+                fun_name,
+                arg_ids: new_child_ids.clone(),
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.replace_children(new_id, new_child_ids);
+            return (insertion_set, updated_ast, new_id);
+        }
+        AstRelation::FunDef {
+            id: _,
+            fun_name,
+            return_type_id,
+            arg_ids,
+            body_id,
+        } => {
+            let (insertions, mut updated_ast, return_child_id) =
+                insert_onwards(return_type_id, ast, new_ast.clone());
+            insertion_set.union(&insertions);
+            let mut new_child_ids: Vec<ID> = vec![];
+            for arg_id in arg_ids {
+                let (insertions, new_updated_ast, arg_child_id) =
+                    insert_onwards(arg_id, updated_ast, new_ast.clone());
+                new_child_ids.push(arg_child_id);
+                updated_ast = new_updated_ast;
+                insertion_set.union(&insertions);
+            }
+            let (insertions, mut updated_ast, body_child_id) =
+                insert_onwards(body_id, updated_ast, new_ast);
+            insertion_set.union(&insertions);
+            let new_id = updated_ast.max_id + 1;
+            let new_relation = AstRelation::FunDef {
+                id: new_id,
+                fun_name,
+                return_type_id: return_child_id,
+                arg_ids: new_child_ids.clone(),
+                body_id: body_child_id,
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.replace_children(new_id, new_child_ids);
+            updated_ast.link_child(new_id, return_child_id);
+            updated_ast.link_child(new_id, body_child_id);
+            return (insertion_set, updated_ast, new_id);
+        }
+        AstRelation::TransUnit { id: _, body_ids } => {
+            let mut updated_ast = ast.clone();
+            let mut new_child_ids: Vec<ID> = vec![];
+            for body_id in body_ids {
+                let (insertions, new_updated_ast, arg_child_id) =
+                    insert_onwards(body_id, updated_ast, new_ast.clone());
+                new_child_ids.push(arg_child_id);
+                updated_ast = new_updated_ast;
+                insertion_set.union(&insertions);
+            }
+            let new_id = ast.max_id + 1;
+            let new_relation = AstRelation::TransUnit {
+                id: new_id,
+                body_ids: new_child_ids.clone(),
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.replace_children(new_id, new_child_ids);
+            return (insertion_set, updated_ast, new_id);
+        }
+    }
 }
 
 fn replace_id_in_relation(r: &AstRelation, id: ID) -> AstRelation {
