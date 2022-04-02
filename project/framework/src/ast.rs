@@ -163,6 +163,7 @@ pub fn get_diff_relation_set(
     let new_root = new_ast.get_node(new_ast.get_root());
     let mut insertion_set = HashSet::new();
     let mut deletion_set = HashSet::new();
+
     // For now we are assuming all top level declarations are function and we will identify them by names.
     // (Also assuming you are more likely to change function order rather than name).
     let mut fun_to_be_deleted: HashMap<ID, bool> = HashMap::new();
@@ -210,18 +211,114 @@ pub fn get_diff_relation_set(
                                     // Insert the new relation.
                                     insertion_set.insert(replacement);
                                 }
+
                                 // Compare argument types (in this case order matters).
+                                // If there are insertions/deletions and not just replacements we have to adjust the function relation.
+                                let mut remaining_args: Vec<ID> = vec![];
+                                let mut args_have_changed = false;
                                 for (index, prev_arg_id) in prev_arg_ids.iter().enumerate() {
                                     if index < new_arg_ids.len() {
                                         let new_arg_id = new_arg_ids[index];
                                         // If a corresponding index relation exist, name and type could differ or match.
-                                        if !relations_match(
-                                            &prev_ast.get_relation(*prev_arg_id),
-                                            &new_ast.get_relation(new_arg_id),
-                                        ) {}
+                                        let prev_arg = prev_ast.get_relation(*prev_arg_id);
+                                        let new_arg = new_ast.get_relation(new_arg_id);
+                                        match (prev_arg, new_arg) {
+                                            (
+                                                AstRelation::Arg {
+                                                    id,
+                                                    var_name: var_name1,
+                                                    type_id: type_id1,
+                                                },
+                                                AstRelation::Arg {
+                                                    id: _,
+                                                    var_name: var_name2,
+                                                    type_id: type_id2,
+                                                },
+                                            ) => {
+                                                let prev_type = prev_ast.get_relation(type_id1);
+                                                let new_type = new_ast.get_relation(type_id2);
+                                                if !relations_match(&prev_type, &new_type) {
+                                                    // Replace type.
+                                                    deletion_set.insert(prev_type);
+                                                    let replacement =
+                                                        replace_id_in_relation(&new_type, type_id1);
+                                                    updated_tree.update_relation(
+                                                        type_id1,
+                                                        replacement.clone(),
+                                                    );
+                                                    insertion_set.insert(replacement);
+                                                }
+                                                if var_name1 != var_name2 {
+                                                    // Replace name.
+                                                    let replacement = AstRelation::Arg {
+                                                        id,
+                                                        var_name: var_name2,
+                                                        type_id: type_id1,
+                                                    };
+                                                    updated_tree
+                                                        .update_relation(id, replacement.clone());
+                                                    insertion_set.insert(replacement);
+                                                }
+                                            }
+                                            _ => panic!("Unexpected node during diffing"),
+                                        }
+                                    } else {
+                                        // This means the previous argument list was longer so we need to delete some.
+                                        let (deletions, new_updated_tree) =
+                                            delete_onwards(*prev_arg_id, updated_tree);
+                                        deletion_set.union(&deletions);
+                                        updated_tree = new_updated_tree;
+                                        args_have_changed = true;
                                     }
                                 }
+                                // This means there are more arguments in the new tree.
+                                if new_arg_ids.len() > prev_arg_ids.len() {
+                                    for (index, new_arg_id) in new_arg_ids.iter().enumerate() {
+                                        if index > prev_arg_ids.len() {
+                                            let (insertions, new_updated_tree, updated_arg_id) =
+                                                insert_onwards(
+                                                    *new_arg_id,
+                                                    updated_tree,
+                                                    new_ast.clone(),
+                                                );
+                                            insertion_set.union(&insertions);
+                                            updated_tree = new_updated_tree;
+                                            remaining_args.push(updated_arg_id);
+                                            args_have_changed = true;
+                                        }
+                                    }
+                                }
+                                if args_have_changed {
+                                    deletion_set.insert(prev_ast.get_relation(prev_id));
+                                    let replacement = AstRelation::FunDef {
+                                        id: prev_id,
+                                        fun_name: prev_fun_name,
+                                        return_type_id: prev_return_type_id,
+                                        // Just change arguments.
+                                        arg_ids: remaining_args,
+                                        body_id: prev_body_id,
+                                    };
+                                    insertion_set.insert(replacement.clone());
+                                    updated_tree.update_relation(prev_id, replacement);
+                                }
+
                                 // Compare function bodies.
+                                let prev_body = prev_ast.get_relation(prev_body_id);
+                                let new_body = new_ast.get_relation(new_body_id);
+                                match (prev_body, new_body) {
+                                    (
+                                        AstRelation::Compound {
+                                            id: _,
+                                            start_id: start_id1,
+                                        },
+                                        AstRelation::Compound {
+                                            id: _,
+                                            start_id: start_id2,
+                                        },
+                                    ) => {}
+                                    _ => panic!("Unexpected node during diffing"),
+                                }
+
                                 // Mark this function as not having to be completely deleted.
                                 fun_to_be_deleted.insert(prev_id, false);
                                 // Break out of the loop since we have now found a matched function.
@@ -236,11 +333,14 @@ pub fn get_diff_relation_set(
         }
     }
     // Iterate over prev functions to be deleted and add result to deletion set (pass tree to be updated as well).
+    let mut remaining_funs: Vec<ID> = vec![];
     for (prev_fun_id, indicator) in fun_to_be_deleted {
         if indicator {
             let (deletions, new_updated_tree) = delete_onwards(prev_fun_id, updated_tree.clone());
             updated_tree = new_updated_tree;
             deletion_set.union(&deletions);
+        } else {
+            remaining_funs.push(prev_fun_id);
         }
     }
     // Iterate over new functions to see which ones aren't matching and add to insertion set (tree as well).
@@ -250,8 +350,17 @@ pub fn get_diff_relation_set(
                 insert_onwards(*new_fun_id, updated_tree.clone(), new_ast.clone());
             updated_tree = new_updated_tree;
             insertion_set.union(&insertions);
+            remaining_funs.push(inserted_fun_id);
         }
     }
+    // Replace root with translation unit that has the correct list of declarations.
+    deletion_set.insert(prev_ast.get_relation(prev_ast.get_root()));
+    let final_root = AstRelation::TransUnit {
+        id: prev_ast.get_root(),
+        body_ids: remaining_funs,
+    };
+    insertion_set.insert(final_root.clone());
+    updated_tree.update_relation(prev_ast.get_root(), final_root);
     // Return result.
     (insertion_set, deletion_set, updated_tree)
 }
@@ -733,7 +842,7 @@ fn replace_id_in_relation(r: &AstRelation, id: ID) -> AstRelation {
 }
 
 // Return true if they are of the same type (and have the same name, if applicable).
-// So effectively ignoring exact IDs (this doesn't mean children haven't changed).
+// So effectively ignoring exact IDs.
 fn relations_match(r1: &AstRelation, r2: &AstRelation) -> bool {
     match (r1, r2) {
         (AstRelation::Char { id: _ }, AstRelation::Char { id: _ }) => return true,
@@ -744,12 +853,12 @@ fn relations_match(r1: &AstRelation, r2: &AstRelation) -> bool {
             AstRelation::Arg {
                 id: _,
                 var_name: var_name1,
-                type_id: _,
+                type_id: type_id1,
             },
             AstRelation::Arg {
                 id: _,
                 var_name: var_name2,
-                type_id: _,
+                type_id: type_id2,
             },
         ) => return var_name1 == var_name2,
         (
@@ -895,4 +1004,9 @@ pub fn get_relation_id(r: &AstRelation) -> ID {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    #[test]
+    fn delete_whole_tree() {}
+    #[test]
+    fn insert_whole_tree() {}
+}
