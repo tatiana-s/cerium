@@ -35,7 +35,7 @@ impl Tree {
         let result = self.arena.get(&index);
         match result {
             Some(node) => node.relation.clone(),
-            None => panic!("No relation with this ID in tree"),
+            None => panic!("No relation with this ID ({}) in tree", index),
         }
     }
 
@@ -178,6 +178,7 @@ pub fn get_diff_relation_set(
                 arg_ids: prev_arg_ids,
                 body_id: prev_body_id,
             } => {
+                println!("Looking at function {}", prev_fun_name.clone());
                 fun_to_be_deleted.insert(prev_id, true);
                 'new_search: for new_fun_id in &new_root.children {
                     let node_to_compare = new_ast.get_node(*new_fun_id);
@@ -192,11 +193,17 @@ pub fn get_diff_relation_set(
                         } => {
                             // Case: function name matches so we keep comparing.
                             if prev_fun_name == new_fun_name {
+                                println!("Found a matching function {}", new_fun_name.clone());
                                 matching_new_funs.push(new_id);
                                 // Compare return type (could either match or not but will definitely be there).
                                 let prev_return_type = prev_ast.get_relation(prev_return_type_id);
                                 let new_return_type = new_ast.get_relation(new_return_type_id);
-                                if !relations_match(&prev_return_type, &new_return_type) {
+                                if !relations_match(
+                                    &prev_return_type,
+                                    &new_return_type,
+                                    prev_ast,
+                                    new_ast,
+                                ) {
                                     // If return type has changed:
                                     // Delete the current return type relation.
                                     deletion_set.insert(prev_return_type);
@@ -237,7 +244,9 @@ pub fn get_diff_relation_set(
                                             ) => {
                                                 let prev_type = prev_ast.get_relation(type_id1);
                                                 let new_type = new_ast.get_relation(type_id2);
-                                                if !relations_match(&prev_type, &new_type) {
+                                                if !relations_match(
+                                                    &prev_type, &new_type, prev_ast, new_ast,
+                                                ) {
                                                     // Replace type.
                                                     deletion_set.insert(prev_type);
                                                     let replacement =
@@ -315,7 +324,18 @@ pub fn get_diff_relation_set(
                                             id: _,
                                             start_id: start_id2,
                                         },
-                                    ) => {}
+                                    ) => {
+                                        let (insertions, deletions, new_updated_tree, _) =
+                                            compare_items(
+                                                start_id1,
+                                                start_id2,
+                                                updated_tree.clone(),
+                                                new_ast.clone(),
+                                            );
+                                        updated_tree = new_updated_tree;
+                                        insertion_set.union(&insertions);
+                                        deletion_set.union(&deletions);
+                                    }
                                     _ => panic!("Unexpected node during diffing"),
                                 }
 
@@ -363,6 +383,198 @@ pub fn get_diff_relation_set(
     updated_tree.update_relation(prev_ast.get_root(), final_root);
     // Return result.
     (insertion_set, deletion_set, updated_tree)
+}
+
+fn compare_items(
+    item_id1: ID,
+    item_id2: ID,
+    t1: Tree,
+    t2: Tree,
+) -> (HashSet<AstRelation>, HashSet<AstRelation>, Tree, ID) {
+    println!("Comparing item {} and {}", item_id1, item_id2);
+    let mut insertion_set = HashSet::new();
+    let mut deletion_set = HashSet::new();
+    let item1 = t1.get_relation(item_id1);
+    let item2 = t2.get_relation(item_id2);
+    let item1_clone = item1.clone();
+    match (item1, item2) {
+        (
+            AstRelation::Item {
+                id: id1,
+                stmt_id: stmt_id1,
+                next_stmt_id: next_stmt_id1,
+            },
+            AstRelation::Item {
+                id: _,
+                stmt_id: stmt_id2,
+                next_stmt_id: next_stmt_id2,
+            },
+        ) => {
+            if relations_match(
+                &t1.get_relation(stmt_id1),
+                &t2.get_relation(stmt_id2),
+                &t2,
+                &t2,
+            ) {
+                // If the statements match just move on to the next item.
+                let (insertions, deletions, mut updated_tree, next_id) =
+                    compare_items(next_stmt_id1, next_stmt_id2, t1, t2);
+                // However the ID of the next statement could have changed due to a new insertion.
+                if next_stmt_id1 != next_id {
+                    let replacement = AstRelation::Item {
+                        id: id1,
+                        stmt_id: stmt_id1,
+                        next_stmt_id: next_id,
+                    };
+                    insertion_set.union(&insertions);
+                    deletion_set.union(&deletions);
+                    insertion_set.insert(replacement.clone());
+                    deletion_set.insert(item1_clone);
+                    updated_tree.update_relation(id1, replacement);
+                    return (insertion_set, deletion_set, updated_tree, id1);
+                } else {
+                    return (insertions, deletions, updated_tree, id1);
+                }
+            } else {
+                // Otherwise: keep comparing the prev item and insert a new item.
+                let (insertions, deletions, updated_tree, next_id) =
+                    compare_items(next_stmt_id1, next_stmt_id2, t1, t2.clone());
+                insertion_set.union(&insertions);
+                deletion_set.union(&deletions);
+                let new_id = updated_tree.max_id + 1;
+                let (insertions, mut updated_tree, stmt_id) =
+                    insert_onwards(stmt_id2, updated_tree, t2);
+                insertion_set.union(&insertions);
+                let new_item = AstRelation::Item {
+                    id: new_id,
+                    stmt_id: stmt_id,
+                    next_stmt_id: next_id,
+                };
+                insertion_set.insert(new_item.clone());
+                updated_tree.add_node(new_id, new_item);
+                return (insertion_set, deletion_set, updated_tree, new_id);
+            }
+        }
+        // Case: we reached the end of the compound in the prev tree and have to insert the rest of the new one.
+        (
+            AstRelation::EndItem {
+                id: id1,
+                stmt_id: stmt_id1,
+            },
+            AstRelation::Item {
+                id: _,
+                stmt_id: stmt_id2,
+                next_stmt_id: next_stmt_id2,
+            },
+        ) => {
+            if relations_match(
+                &t1.get_relation(stmt_id1),
+                &t2.get_relation(stmt_id2),
+                &t2,
+                &t2,
+            ) {
+                // Insert from whole item onwards.
+                let (insertions, mut updated_tree, next_item) =
+                    insert_onwards(next_stmt_id2, t1, t2);
+                // Change the prev item to normal instead of end item.
+                let replacement = AstRelation::Item {
+                    id: id1,
+                    stmt_id: stmt_id1,
+                    next_stmt_id: next_item,
+                };
+                insertion_set.union(&insertions);
+                insertion_set.insert(replacement.clone());
+                deletion_set.insert(item1_clone);
+                updated_tree.update_relation(id1, replacement);
+                return (insertion_set, deletion_set, updated_tree, id1);
+            } else {
+                // Just insert from whole item onwards (basically skip other).
+                let (insertions, updated_tree, next_item) = insert_onwards(next_stmt_id2, t1, t2);
+                return (insertions, deletion_set, updated_tree, next_item);
+            }
+        }
+        (
+            // Case: we reached the end of the compound in the new tree and have to delete the rest of the prev one.
+            AstRelation::Item {
+                id: id1,
+                stmt_id: stmt_id1,
+                next_stmt_id: next_stmt_id1,
+            },
+            AstRelation::EndItem {
+                id: _,
+                stmt_id: stmt_id2,
+            },
+        ) => {
+            if relations_match(
+                &t1.get_relation(stmt_id1),
+                &t2.get_relation(stmt_id2),
+                &t2,
+                &t2,
+            ) {
+                // Delete from next statement onwards.
+                let (deletions, mut updated_tree) = delete_onwards(next_stmt_id1, t1);
+                deletion_set.union(&deletions);
+                // Make this item an end item instead.
+                let replacement = AstRelation::EndItem {
+                    id: id1,
+                    stmt_id: stmt_id1,
+                };
+                insertion_set.insert(replacement.clone());
+                deletion_set.insert(item1_clone);
+                updated_tree.update_relation(id1, replacement);
+                return (insertion_set, deletion_set, updated_tree, id1);
+            } else {
+                // Delete from next statement onwards.
+                let (deletions, updated_tree) = delete_onwards(next_stmt_id1, t1);
+                deletion_set.union(&deletions);
+                // Insert the differing statement.
+                let (insertions, mut updated_tree, stmt_id) =
+                    insert_onwards(stmt_id2, updated_tree, t2);
+                insertion_set.union(&insertions);
+                // Make this item an end item instead.
+                let replacement = AstRelation::EndItem {
+                    id: id1,
+                    stmt_id: stmt_id,
+                };
+                insertion_set.insert(replacement.clone());
+                deletion_set.insert(item1_clone);
+                updated_tree.update_relation(id1, replacement);
+                return (insertion_set, deletion_set, updated_tree, id1);
+            }
+        }
+        (
+            // Case: no further comparisons needed after this one.
+            AstRelation::EndItem {
+                id: id1,
+                stmt_id: stmt_id1,
+            },
+            AstRelation::EndItem {
+                id: _,
+                stmt_id: stmt_id2,
+            },
+        ) => {
+            if relations_match(
+                &t1.get_relation(stmt_id1),
+                &t2.get_relation(stmt_id2),
+                &t2,
+                &t2,
+            ) {
+                return (insertion_set, deletion_set, t1, id1);
+            } else {
+                let (insertions, mut updated_tree, stmt_id) = insert_onwards(stmt_id2, t1, t2);
+                let replacement = AstRelation::EndItem {
+                    id: id1,
+                    stmt_id: stmt_id,
+                };
+                insertion_set.union(&insertions);
+                insertion_set.insert(replacement.clone());
+                deletion_set.insert(item1_clone);
+                updated_tree.update_relation(id1, replacement);
+                return (insertion_set, deletion_set, updated_tree, id1);
+            }
+        }
+        (_, _) => panic!("Unexpected node during diffing"),
+    }
 }
 
 // Delete the node with the given ID and all its children.
@@ -842,8 +1054,8 @@ fn replace_id_in_relation(r: &AstRelation, id: ID) -> AstRelation {
 }
 
 // Return true if they are of the same type (and have the same name, if applicable).
-// So effectively ignoring exact IDs.
-fn relations_match(r1: &AstRelation, r2: &AstRelation) -> bool {
+// So effectively same structure just ignoring exact IDs.
+fn relations_match(r1: &AstRelation, r2: &AstRelation, t1: &Tree, t2: &Tree) -> bool {
     match (r1, r2) {
         (AstRelation::Char { id: _ }, AstRelation::Char { id: _ }) => return true,
         (AstRelation::Float { id: _ }, AstRelation::Float { id: _ }) => return true,
@@ -860,7 +1072,15 @@ fn relations_match(r1: &AstRelation, r2: &AstRelation) -> bool {
                 var_name: var_name2,
                 type_id: type_id2,
             },
-        ) => return var_name1 == var_name2,
+        ) => {
+            return var_name1 == var_name2
+                && relations_match(
+                    &t1.get_relation(*type_id1),
+                    &t2.get_relation(*type_id2),
+                    t1,
+                    t2,
+                )
+        }
         (
             AstRelation::Var {
                 id: _,
@@ -874,84 +1094,174 @@ fn relations_match(r1: &AstRelation, r2: &AstRelation) -> bool {
         (
             AstRelation::BinaryOp {
                 id: _,
-                arg1_id: _,
-                arg2_id: _,
+                arg1_id: arg1_id1,
+                arg2_id: arg2_id1,
             },
             AstRelation::BinaryOp {
                 id: _,
-                arg1_id: _,
-                arg2_id: _,
+                arg1_id: arg1_id2,
+                arg2_id: arg2_id2,
             },
-        ) => return true,
+        ) => {
+            return relations_match(
+                &t1.get_relation(*arg1_id1),
+                &t2.get_relation(*arg1_id2),
+                t1,
+                t2,
+            ) && relations_match(
+                &t1.get_relation(*arg2_id1),
+                &t2.get_relation(*arg2_id2),
+                t1,
+                t2,
+            )
+        }
         (
-            AstRelation::EndItem { id: _, stmt_id: _ },
-            AstRelation::EndItem { id: _, stmt_id: _ },
-        ) => return true,
+            AstRelation::EndItem {
+                id: _,
+                stmt_id: stmt_id1,
+            },
+            AstRelation::EndItem {
+                id: _,
+                stmt_id: stmt_id2,
+            },
+        ) => {
+            return relations_match(
+                &t1.get_relation(*stmt_id1),
+                &t2.get_relation(*stmt_id2),
+                t1,
+                t2,
+            )
+        }
         (
             AstRelation::Item {
                 id: _,
-                stmt_id: _,
-                next_stmt_id: _,
+                stmt_id: stmt_id1,
+                next_stmt_id: next_stmt_id1,
             },
             AstRelation::Item {
                 id: _,
-                stmt_id: _,
-                next_stmt_id: _,
+                stmt_id: stmt_id2,
+                next_stmt_id: next_stmt_id2,
             },
-        ) => return true,
+        ) => {
+            return relations_match(
+                &t1.get_relation(*stmt_id1),
+                &t2.get_relation(*stmt_id2),
+                t1,
+                t2,
+            ) && relations_match(
+                &t1.get_relation(*next_stmt_id1),
+                &t2.get_relation(*next_stmt_id2),
+                t1,
+                t2,
+            )
+        }
         (
-            AstRelation::Compound { id: _, start_id: _ },
-            AstRelation::Compound { id: _, start_id: _ },
-        ) => return true,
-        (AstRelation::Return { id: _, expr_id: _ }, AstRelation::Return { id: _, expr_id: _ }) => {
-            return true
+            AstRelation::Compound {
+                id: _,
+                start_id: start_id1,
+            },
+            AstRelation::Compound {
+                id: _,
+                start_id: start_id2,
+            },
+        ) => {
+            return relations_match(
+                &t1.get_relation(*start_id1),
+                &t2.get_relation(*start_id2),
+                t1,
+                t2,
+            )
+        }
+        (
+            AstRelation::Return {
+                id: _,
+                expr_id: expr_id1,
+            },
+            AstRelation::Return {
+                id: _,
+                expr_id: expr_id2,
+            },
+        ) => {
+            return relations_match(
+                &t1.get_relation(*expr_id1),
+                &t2.get_relation(*expr_id2),
+                t1,
+                t2,
+            )
         }
         (
             AstRelation::Assign {
                 id: _,
                 var_name: var_name1,
-                type_id: _,
-                expr_id: _,
+                type_id: type_id1,
+                expr_id: expr_id1,
             },
             AstRelation::Assign {
                 id: _,
                 var_name: var_name2,
-                type_id: _,
-                expr_id: _,
+                type_id: type_id2,
+                expr_id: expr_id2,
             },
-        ) => return var_name1 == var_name2,
+        ) => {
+            return var_name1 == var_name2
+                && return relations_match(
+                    &t1.get_relation(*type_id1),
+                    &t2.get_relation(*type_id2),
+                    t1,
+                    t2,
+                ) && return relations_match(
+                    &t1.get_relation(*expr_id1),
+                    &t2.get_relation(*expr_id2),
+                    t1,
+                    t2,
+                )
+        }
         (
             AstRelation::FunCall {
                 id: _,
                 fun_name: fun_name1,
-                arg_ids: _,
+                arg_ids: arg_ids1,
             },
             AstRelation::FunCall {
                 id: _,
                 fun_name: fun_name2,
-                arg_ids: _,
+                arg_ids: arg_ids2,
             },
-        ) => return fun_name1 == fun_name2,
+        ) => {
+            let mut args_result: bool = true;
+            for (index, arg_id1) in arg_ids1.iter().enumerate() {
+                if !relations_match(
+                    &t1.get_relation(*arg_id1),
+                    &t2.get_relation(arg_ids2[index]),
+                    t1,
+                    t2,
+                ) {
+                    args_result = false;
+                }
+            }
+            return args_result && fun_name1 == fun_name2;
+        }
         (
             AstRelation::FunDef {
                 id: _,
-                fun_name: fun_name1,
+                fun_name: _,
                 return_type_id: _,
                 arg_ids: _,
                 body_id: _,
             },
             AstRelation::FunDef {
                 id: _,
-                fun_name: fun_name2,
+                fun_name: _,
                 return_type_id: _,
                 arg_ids: _,
                 body_id: _,
             },
-        ) => return fun_name1 == fun_name2,
+        ) => panic!("Called matching function on construct that should be handled on higher level"),
         (
             AstRelation::TransUnit { id: _, body_ids: _ },
             AstRelation::TransUnit { id: _, body_ids: _ },
-        ) => return true,
+        ) => panic!("Called matching function on construct that should be handled on higher level"),
         (_, _) => return false,
     }
 }
