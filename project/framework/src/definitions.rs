@@ -1,7 +1,7 @@
 use crate::ddlog_interface;
 use convert_variant_derive::EquivRelId;
 use ddlog_interface::EquivRelId;
-use type_checker_ddlog::typedefs::*;
+// use type_checker_ddlog::typedefs::*;
 use type_checker_ddlog::Relations;
 
 // Type aliases for consistency and easy changes.

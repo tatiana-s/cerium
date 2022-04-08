@@ -91,6 +91,7 @@ fn convert_relation(ast_relation: &AstRelation, update_type: UpdateKind) -> Upda
 }
 
 // See relation changes (for debugging purposes).
+#[allow(dead_code)]
 fn dump_delta(delta: &DeltaMap<DDValue>) {
     for (_, changes) in delta.iter() {
         for (val, weight) in changes.iter() {

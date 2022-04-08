@@ -24,7 +24,7 @@ fn parse_with_lang_c(file_path: &String) -> Tree {
             let mut ast_builder = AstBuilder::new();
             return AstBuilder::build_tree(&mut ast_builder, &parse.unit);
         }
-        Err(e) => {
+        Err(_) => {
             panic!("Error during parsing")
         }
     }
