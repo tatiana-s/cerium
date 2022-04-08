@@ -2,7 +2,7 @@ use crate::ast::Tree;
 use crate::definitions::{AstRelation, ID};
 use std::collections::HashMap;
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 enum Type {
     VoidType,
     IntType,
@@ -12,7 +12,7 @@ enum Type {
     ErrorType,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 struct FunType {
     return_type: Type,
     arg_types: Vec<Type>,
@@ -35,23 +35,25 @@ fn type_check_trans_unit(
 ) -> Type {
     match node {
         AstRelation::TransUnit { id: _, body_ids } => {
-            let mut body_correct = true;
+            let mut new_var_context = var_context.clone();
+            let mut new_fun_context = fun_context.clone();
             for body_id in body_ids {
                 match type_check_fun_def(
                     ast.get_relation(body_id),
                     ast,
-                    var_context.clone(),
-                    fun_context.clone(),
+                    new_var_context.clone(),
+                    new_fun_context.clone(),
                 ) {
-                    Type::ErrorType => body_correct = false,
-                    Type::OkType => {}
-                    _ => panic!("Unexpected type"),
+                    (Type::ErrorType, _, _) => {
+                        return Type::ErrorType;
+                    }
+                    (_, updated_var_context, updated_fun_context) => {
+                        new_var_context = updated_var_context;
+                        new_fun_context = updated_fun_context;
+                    }
                 }
             }
-            if body_correct {
-                return Type::OkType;
-            }
-            return Type::ErrorType;
+            return Type::OkType;
         }
         _ => panic!("Unexpected syntax"),
     }
@@ -62,7 +64,7 @@ fn type_check_fun_def(
     ast: &Tree,
     var_context: HashMap<String, Type>,
     fun_context: HashMap<String, FunType>,
-) -> Type {
+) -> (Type, HashMap<String, Type>, HashMap<String, FunType>) {
     match node {
         AstRelation::FunDef {
             id: _,
@@ -81,12 +83,17 @@ fn type_check_fun_def(
                     arg_types,
                 },
             );
-            return type_check_compound(
-                &ast.get_relation(body_id),
-                ast,
+            // Because of scoping any context modification inside the function doesn't affect top level.
+            return (
+                type_check_compound(
+                    &ast.get_relation(body_id),
+                    ast,
+                    new_var_context.clone(),
+                    new_fun_context.clone(),
+                    fun_name,
+                ),
                 new_var_context,
                 new_fun_context,
-                fun_name,
             );
         }
         _ => panic!("Unexpected syntax"),
@@ -159,7 +166,8 @@ fn type_check_item(
                 fun_context.clone(),
                 current_fun.clone(),
             ) {
-                (Type::OkType, new_var_context) => {
+                (Type::ErrorType, _) => Type::ErrorType,
+                (_, new_var_context) => {
                     return type_check_item(
                         ast.get_relation(next_stmt_id),
                         ast,
@@ -168,8 +176,6 @@ fn type_check_item(
                         current_fun,
                     )
                 }
-                (Type::ErrorType, _) => Type::ErrorType,
-                _ => panic!("Unexpected type"),
             }
         }
         AstRelation::EndItem { id: _, stmt_id } => {
