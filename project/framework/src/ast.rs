@@ -178,7 +178,6 @@ pub fn get_diff_relation_set(
                 arg_ids: prev_arg_ids,
                 body_id: prev_body_id,
             } => {
-                println!("Looking at function {}", prev_fun_name.clone());
                 fun_to_be_deleted.insert(prev_id, true);
                 'new_search: for new_fun_id in &new_root.children {
                     let node_to_compare = new_ast.get_node(*new_fun_id);
@@ -193,7 +192,6 @@ pub fn get_diff_relation_set(
                         } => {
                             // Case: function name matches so we keep comparing.
                             if prev_fun_name == new_fun_name {
-                                println!("Found a matching function {}", new_fun_name.clone());
                                 matching_new_funs.push(new_id);
                                 // Compare return type (could either match or not but will definitely be there).
                                 let prev_return_type = prev_ast.get_relation(prev_return_type_id);
@@ -391,7 +389,6 @@ fn compare_items(
     t1: Tree,
     t2: Tree,
 ) -> (HashSet<AstRelation>, HashSet<AstRelation>, Tree, ID) {
-    println!("Comparing item {} and {}", item_id1, item_id2);
     let mut insertion_set = HashSet::new();
     let mut deletion_set = HashSet::new();
     let item1 = t1.get_relation(item_id1);
@@ -413,7 +410,7 @@ fn compare_items(
             if relations_match(
                 &t1.get_relation(stmt_id1),
                 &t2.get_relation(stmt_id2),
-                &t2,
+                &t1,
                 &t2,
             ) {
                 // If the statements match just move on to the next item.
@@ -470,7 +467,7 @@ fn compare_items(
             if relations_match(
                 &t1.get_relation(stmt_id1),
                 &t2.get_relation(stmt_id2),
-                &t2,
+                &t1,
                 &t2,
             ) {
                 // Insert from whole item onwards.
@@ -508,7 +505,7 @@ fn compare_items(
             if relations_match(
                 &t1.get_relation(stmt_id1),
                 &t2.get_relation(stmt_id2),
-                &t2,
+                &t1,
                 &t2,
             ) {
                 // Delete from next statement onwards.
@@ -556,7 +553,7 @@ fn compare_items(
             if relations_match(
                 &t1.get_relation(stmt_id1),
                 &t2.get_relation(stmt_id2),
-                &t2,
+                &t1,
                 &t2,
             ) {
                 return (insertion_set, deletion_set, t1, id1);
