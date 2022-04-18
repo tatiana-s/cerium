@@ -273,7 +273,9 @@ pub fn get_diff_relation_set(
                                         // This means the previous argument list was longer so we need to delete some.
                                         let (deletions, new_updated_tree) =
                                             delete_onwards(*prev_arg_id, updated_tree);
-                                        deletion_set.union(&deletions);
+                                        for relation in deletions {
+                                            deletion_set.insert(relation);
+                                        }
                                         updated_tree = new_updated_tree;
                                         args_have_changed = true;
                                     }
@@ -288,7 +290,9 @@ pub fn get_diff_relation_set(
                                                     updated_tree,
                                                     new_ast.clone(),
                                                 );
-                                            insertion_set.union(&insertions);
+                                            for relation in insertions {
+                                                insertion_set.insert(relation);
+                                            }
                                             updated_tree = new_updated_tree;
                                             remaining_args.push(updated_arg_id);
                                             args_have_changed = true;
@@ -331,8 +335,12 @@ pub fn get_diff_relation_set(
                                                 new_ast.clone(),
                                             );
                                         updated_tree = new_updated_tree;
-                                        insertion_set.union(&insertions);
-                                        deletion_set.union(&deletions);
+                                        for relation in insertions {
+                                            insertion_set.insert(relation);
+                                        }
+                                        for relation in deletions {
+                                            deletion_set.insert(relation);
+                                        }
                                     }
                                     _ => panic!("Unexpected node during diffing"),
                                 }
@@ -356,7 +364,9 @@ pub fn get_diff_relation_set(
         if indicator {
             let (deletions, new_updated_tree) = delete_onwards(prev_fun_id, updated_tree.clone());
             updated_tree = new_updated_tree;
-            deletion_set.union(&deletions);
+            for relation in deletions {
+                deletion_set.insert(relation);
+            }
         } else {
             remaining_funs.push(prev_fun_id);
         }
@@ -367,7 +377,9 @@ pub fn get_diff_relation_set(
             let (insertions, new_updated_tree, inserted_fun_id) =
                 insert_onwards(*new_fun_id, updated_tree.clone(), new_ast.clone());
             updated_tree = new_updated_tree;
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             remaining_funs.push(inserted_fun_id);
         }
     }
@@ -423,8 +435,12 @@ fn compare_items(
                         stmt_id: stmt_id1,
                         next_stmt_id: next_id,
                     };
-                    insertion_set.union(&insertions);
-                    deletion_set.union(&deletions);
+                    for relation in insertions {
+                        insertion_set.insert(relation);
+                    }
+                    for relation in deletions {
+                        deletion_set.insert(relation);
+                    }
                     insertion_set.insert(replacement.clone());
                     deletion_set.insert(item1_clone);
                     updated_tree.update_relation(id1, replacement);
@@ -436,12 +452,18 @@ fn compare_items(
                 // Otherwise: keep comparing the prev item and insert a new item.
                 let (insertions, deletions, updated_tree, next_id) =
                     compare_items(next_stmt_id1, next_stmt_id2, t1, t2.clone());
-                insertion_set.union(&insertions);
-                deletion_set.union(&deletions);
+                for relation in insertions {
+                    insertion_set.insert(relation);
+                }
+                for relation in deletions {
+                    deletion_set.insert(relation);
+                }
                 let new_id = updated_tree.max_id + 1;
                 let (insertions, mut updated_tree, stmt_id) =
                     insert_onwards(stmt_id2, updated_tree, t2);
-                insertion_set.union(&insertions);
+                for relation in insertions {
+                    insertion_set.insert(relation);
+                }
                 let new_item = AstRelation::Item {
                     id: new_id,
                     stmt_id: stmt_id,
@@ -449,6 +471,8 @@ fn compare_items(
                 };
                 insertion_set.insert(new_item.clone());
                 updated_tree.add_node(new_id, new_item);
+                updated_tree.link_child(new_id, stmt_id);
+                updated_tree.link_child(new_id, next_id);
                 return (insertion_set, deletion_set, updated_tree, new_id);
             }
         }
@@ -479,7 +503,9 @@ fn compare_items(
                     stmt_id: stmt_id1,
                     next_stmt_id: next_item,
                 };
-                insertion_set.union(&insertions);
+                for relation in insertions {
+                    insertion_set.insert(relation);
+                }
                 insertion_set.insert(replacement.clone());
                 deletion_set.insert(item1_clone);
                 updated_tree.update_relation(id1, replacement);
@@ -510,7 +536,9 @@ fn compare_items(
             ) {
                 // Delete from next statement onwards.
                 let (deletions, mut updated_tree) = delete_onwards(next_stmt_id1, t1);
-                deletion_set.union(&deletions);
+                for relation in deletions {
+                    deletion_set.insert(relation);
+                }
                 // Make this item an end item instead.
                 let replacement = AstRelation::EndItem {
                     id: id1,
@@ -523,11 +551,15 @@ fn compare_items(
             } else {
                 // Delete from next statement onwards.
                 let (deletions, updated_tree) = delete_onwards(next_stmt_id1, t1);
-                deletion_set.union(&deletions);
+                for relation in deletions {
+                    deletion_set.insert(relation);
+                }
                 // Insert the differing statement.
                 let (insertions, mut updated_tree, stmt_id) =
                     insert_onwards(stmt_id2, updated_tree, t2);
-                insertion_set.union(&insertions);
+                for relation in insertions {
+                    insertion_set.insert(relation);
+                }
                 // Make this item an end item instead.
                 let replacement = AstRelation::EndItem {
                     id: id1,
@@ -563,7 +595,9 @@ fn compare_items(
                     id: id1,
                     stmt_id: stmt_id,
                 };
-                insertion_set.union(&insertions);
+                for relation in insertions {
+                    insertion_set.insert(relation);
+                }
                 insertion_set.insert(replacement.clone());
                 deletion_set.insert(item1_clone);
                 updated_tree.update_relation(id1, replacement);
@@ -626,7 +660,9 @@ fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
                 ast.max_id = *ast.arena.keys().max().unwrap();
             }
             let (child_set, updated_ast) = delete_onwards(type_id, ast);
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             return (delete_set, updated_ast);
         }
         AstRelation::Var { id: _, var_name: _ } => {
@@ -648,9 +684,13 @@ fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
                 ast.max_id = *ast.arena.keys().max().unwrap();
             }
             let (child_set, updated_ast) = delete_onwards(arg1_id, ast);
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             let (child_set, updated_ast) = delete_onwards(arg2_id, updated_ast);
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             return (delete_set, updated_ast);
         }
         AstRelation::EndItem { id: _, stmt_id } => {
@@ -660,7 +700,9 @@ fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
                 ast.max_id = *ast.arena.keys().max().unwrap();
             }
             let (child_set, updated_ast) = delete_onwards(stmt_id, ast);
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             return (delete_set, updated_ast);
         }
         AstRelation::Item {
@@ -674,9 +716,13 @@ fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
                 ast.max_id = *ast.arena.keys().max().unwrap();
             }
             let (child_set, updated_ast) = delete_onwards(stmt_id, ast);
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             let (child_set, updated_ast) = delete_onwards(next_stmt_id, updated_ast);
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             return (delete_set, updated_ast);
         }
         AstRelation::Compound { id: _, start_id } => {
@@ -686,7 +732,9 @@ fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
                 ast.max_id = *ast.arena.keys().max().unwrap();
             }
             let (child_set, updated_ast) = delete_onwards(start_id, ast);
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             return (delete_set, updated_ast);
         }
         AstRelation::Return { id: _, expr_id } => {
@@ -696,7 +744,9 @@ fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
                 ast.max_id = *ast.arena.keys().max().unwrap();
             }
             let (child_set, updated_ast) = delete_onwards(expr_id, ast);
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             return (delete_set, updated_ast);
         }
         AstRelation::Assign {
@@ -711,9 +761,13 @@ fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
                 ast.max_id = *ast.arena.keys().max().unwrap();
             }
             let (child_set, updated_ast) = delete_onwards(type_id, ast);
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             let (child_set, updated_ast) = delete_onwards(expr_id, updated_ast);
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             return (delete_set, updated_ast);
         }
         AstRelation::FunCall {
@@ -730,7 +784,9 @@ fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
             for arg_id in arg_ids {
                 let (child_set, new_updated_ast) = delete_onwards(arg_id, updated_ast.clone());
                 updated_ast = new_updated_ast;
-                delete_set.union(&child_set);
+                for relation in child_set {
+                    delete_set.insert(relation);
+                }
             }
             return (delete_set, ast);
         }
@@ -749,14 +805,20 @@ fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
             let mut updated_ast = ast.clone();
             let (child_set, new_updated_ast) = delete_onwards(return_type_id, updated_ast);
             updated_ast = new_updated_ast;
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             for arg_id in arg_ids {
                 let (child_set, new_updated_ast) = delete_onwards(arg_id, updated_ast.clone());
                 updated_ast = new_updated_ast;
-                delete_set.union(&child_set);
+                for relation in child_set {
+                    delete_set.insert(relation);
+                }
             }
             let (child_set, updated_ast) = delete_onwards(body_id, updated_ast);
-            delete_set.union(&child_set);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
             return (delete_set, updated_ast);
         }
         AstRelation::TransUnit { id: _, body_ids } => {
@@ -769,7 +831,9 @@ fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
             for body_id in body_ids {
                 let (child_set, new_updated_ast) = delete_onwards(body_id, updated_ast);
                 updated_ast = new_updated_ast;
-                delete_set.union(&child_set);
+                for relation in child_set {
+                    delete_set.insert(relation);
+                }
             }
             return (delete_set, ast);
         }
@@ -821,7 +885,9 @@ fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRela
         } => {
             let (insertions, mut updated_ast, type_child_id) =
                 insert_onwards(type_id, ast, new_ast);
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let new_id = updated_ast.max_id + 1;
             let new_relation = AstRelation::Arg {
                 id: new_id,
@@ -850,10 +916,14 @@ fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRela
         } => {
             let (insertions, updated_ast, arg1_child_id) =
                 insert_onwards(arg1_id, ast, new_ast.clone());
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let (insertions, mut updated_ast, arg2_child_id) =
                 insert_onwards(arg2_id, updated_ast, new_ast);
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let new_id = updated_ast.max_id + 1;
             let new_relation = AstRelation::BinaryOp {
                 id: new_id,
@@ -869,7 +939,9 @@ fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRela
         AstRelation::EndItem { id: _, stmt_id } => {
             let (insertions, mut updated_ast, stmt_child_id) =
                 insert_onwards(stmt_id, ast, new_ast);
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let new_id = updated_ast.max_id + 1;
             let new_relation = AstRelation::EndItem {
                 id: new_id,
@@ -887,10 +959,14 @@ fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRela
         } => {
             let (insertions, updated_ast, stmt_child_id) =
                 insert_onwards(stmt_id, ast, new_ast.clone());
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let (insertions, mut updated_ast, next_stmt_child_id) =
                 insert_onwards(next_stmt_id, updated_ast, new_ast);
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let new_id = updated_ast.max_id + 1;
             let new_relation = AstRelation::Item {
                 id: new_id,
@@ -906,7 +982,9 @@ fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRela
         AstRelation::Compound { id: _, start_id } => {
             let (insertions, mut updated_ast, start_child_id) =
                 insert_onwards(start_id, ast, new_ast);
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let new_id = updated_ast.max_id + 1;
             let new_relation = AstRelation::Compound {
                 id: new_id,
@@ -920,7 +998,9 @@ fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRela
         AstRelation::Return { id: _, expr_id } => {
             let (insertions, mut updated_ast, expr_child_id) =
                 insert_onwards(expr_id, ast, new_ast);
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let new_id = updated_ast.max_id + 1;
             let new_relation = AstRelation::Return {
                 id: new_id,
@@ -939,10 +1019,14 @@ fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRela
         } => {
             let (insertions, updated_ast, type_child_id) =
                 insert_onwards(type_id, ast, new_ast.clone());
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let (insertions, mut updated_ast, expr_child_id) =
                 insert_onwards(expr_id, updated_ast, new_ast);
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let new_id = updated_ast.max_id + 1;
             let new_relation = AstRelation::Assign {
                 id: new_id,
@@ -968,7 +1052,9 @@ fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRela
                     insert_onwards(arg_id, updated_ast, new_ast.clone());
                 new_child_ids.push(arg_child_id);
                 updated_ast = new_updated_ast;
-                insertion_set.union(&insertions);
+                for relation in insertions {
+                    insertion_set.insert(relation);
+                }
             }
             let new_id = ast.max_id + 1;
             let new_relation = AstRelation::FunCall {
@@ -990,18 +1076,24 @@ fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRela
         } => {
             let (insertions, mut updated_ast, return_child_id) =
                 insert_onwards(return_type_id, ast, new_ast.clone());
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let mut new_child_ids: Vec<ID> = vec![];
             for arg_id in arg_ids {
                 let (insertions, new_updated_ast, arg_child_id) =
                     insert_onwards(arg_id, updated_ast, new_ast.clone());
                 new_child_ids.push(arg_child_id);
                 updated_ast = new_updated_ast;
-                insertion_set.union(&insertions);
+                for relation in insertions {
+                    insertion_set.insert(relation);
+                }
             }
             let (insertions, mut updated_ast, body_child_id) =
                 insert_onwards(body_id, updated_ast, new_ast);
-            insertion_set.union(&insertions);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
             let new_id = updated_ast.max_id + 1;
             let new_relation = AstRelation::FunDef {
                 id: new_id,
@@ -1025,7 +1117,9 @@ fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRela
                     insert_onwards(body_id, updated_ast, new_ast.clone());
                 new_child_ids.push(arg_child_id);
                 updated_ast = new_updated_ast;
-                insertion_set.union(&insertions);
+                for relation in insertions {
+                    insertion_set.insert(relation);
+                }
             }
             let new_id = ast.max_id + 1;
             let new_relation = AstRelation::TransUnit {
