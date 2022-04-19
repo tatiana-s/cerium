@@ -12,12 +12,11 @@ use std::time::Duration;
 // DDlog imports.
 use differential_datalog::api::HDDlog;
 
-// Modules.
-pub mod ast;
-pub mod ddlog_interface;
-pub mod definitions;
-pub mod parser_interface;
-pub mod standard_type_checker;
+// Internal imports.
+use cerium_framework::ast;
+use cerium_framework::ddlog_interface;
+use cerium_framework::definitions;
+use cerium_framework::parser_interface;
 
 fn main() {
     // Read command line arguments.
