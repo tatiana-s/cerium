@@ -24,8 +24,8 @@ pub fn run_ddlog_type_checker(
     delete_set: HashSet<AstRelation>,
     prev_result: bool,
 ) -> bool {
-    println!("{:?}", insert_set);
-    println!("{:?}", delete_set);
+    // println!("{:?}", insert_set);
+    // println!("{:?}", delete_set);
     // Start transaction.
     hddlog.transaction_start().unwrap();
     // Updates.
