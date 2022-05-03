@@ -24,8 +24,8 @@ pub fn run_ddlog_type_checker(
     delete_set: HashSet<AstRelation>,
     prev_result: bool,
 ) -> bool {
-    // println!("{:?}", insert_set);
-    // println!("{:?}", delete_set);
+    //println!("{:?}", insert_set);
+    //println!("{:?}", delete_set);
     // Start transaction.
     hddlog.transaction_start().unwrap();
     // Updates.
@@ -44,7 +44,7 @@ pub fn run_ddlog_type_checker(
     // See result.
     // Comment/uncomment dump delta debug statement.
     let mut delta = hddlog.transaction_commit_dump_changes().unwrap();
-    // dump_delta(&delta);
+    dump_delta(&delta);
     let ok_program = delta.get_rel(Relations::OkProgram as RelId);
     let mut new_result = false;
     if prev_result {
@@ -199,7 +199,7 @@ fn get_equiv_ddvalue(ast_relation: &AstRelation) -> DDValue {
         .into_ddvalue(),
         AstRelation::Void { id } => Void { id }.into_ddvalue(),
         AstRelation::Int { id } => Int { id }.into_ddvalue(),
-        AstRelation::Float { id } => Void { id }.into_ddvalue(),
+        AstRelation::Float { id } => Float { id }.into_ddvalue(),
         AstRelation::Char { id } => Char { id }.into_ddvalue(),
     }
 }

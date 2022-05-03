@@ -2,8 +2,8 @@ extern crate lang_c;
 
 use lang_c::ast as parse_ast;
 use lang_c::driver::{parse, Config};
-use lang_c::span::Span;
 // use lang_c::print::Printer;
+use lang_c::span::Span;
 // use lang_c::visit::*;
 
 use crate::ast::Tree;
@@ -24,8 +24,8 @@ fn parse_with_lang_c(file_path: &String) -> Tree {
             let mut ast_builder = AstBuilder::new();
             return AstBuilder::build_tree(&mut ast_builder, &parse.unit);
         }
-        Err(_) => {
-            panic!("Error during parsing")
+        Err(e) => {
+            panic!("Error during parsing: {:?}", e)
         }
     }
 }

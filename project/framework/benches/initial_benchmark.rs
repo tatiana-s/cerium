@@ -1,12 +1,14 @@
-use cerium_framework::run_incremental_type_checker_once;
-use cerium_framework::run_standard_type_checker_once;
+use cerium_framework::single_type_check_datalog;
+use cerium_framework::single_type_check_standard;
 use criterion::{criterion_group, criterion_main, Criterion};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("Example 2 Initial Run");
-    group.bench_function("Standard", |b| b.iter(|| run_standard_type_checker_once()));
+    group.bench_function("Standard", |b| {
+        b.iter(|| single_type_check_standard(String::from("./benches/dataset/program1_1.c")))
+    });
     group.bench_function("Incremental", |b| {
-        b.iter(|| run_incremental_type_checker_once())
+        b.iter(|| single_type_check_datalog(String::from("./benches/dataset/program1_1.c")))
     });
     group.finish();
 }
