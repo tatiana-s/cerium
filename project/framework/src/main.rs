@@ -21,13 +21,14 @@ fn main() {
     if args.len() == 3 {
         let option = &args[2];
         if *option == String::from("-s") {
-            let initial_result = cerium_framework::single_type_check_standard(file_path.clone());
+            let (initial_result, _) =
+                cerium_framework::single_standard_type_check(file_path.clone());
             if initial_result {
                 println!("Program correctly typed ✅");
             } else {
                 println!("Program typing error ❌");
             }
-            if let Err(e) = cerium_framework::repeated_type_check_standard(file_path) {
+            if let Err(e) = cerium_framework::repeated_standard_type_check(file_path) {
                 println!("error: {:?}", e)
             }
         }
@@ -41,7 +42,8 @@ fn main() {
     ast.pretty_print();
     let insert_set: HashSet<definitions::AstRelation> = ast::get_initial_relation_set(&ast);
     let delete_set: HashSet<definitions::AstRelation> = HashSet::new();
-    let result = ddlog_interface::run_ddlog_type_checker(&hddlog, insert_set, delete_set, false);
+    let result =
+        ddlog_interface::run_ddlog_type_checker(&hddlog, insert_set, delete_set, false, false);
 
     // Continue watching the file for changes.
     // TO-DO: add support for type-checking directories.

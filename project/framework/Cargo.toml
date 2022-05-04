@@ -22,3 +22,7 @@ criterion = "0.3"
 [[bench]]
 name = "initial_benchmark"
 harness = false
+
+[[bench]]
+name = "changes_benchmark"
+harness = false

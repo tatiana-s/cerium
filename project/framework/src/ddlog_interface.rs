@@ -23,6 +23,7 @@ pub fn run_ddlog_type_checker(
     insert_set: HashSet<AstRelation>,
     delete_set: HashSet<AstRelation>,
     prev_result: bool,
+    disable_output: bool,
 ) -> bool {
     //println!("{:?}", insert_set);
     //println!("{:?}", delete_set);
@@ -44,28 +45,30 @@ pub fn run_ddlog_type_checker(
     // See result.
     // Comment/uncomment dump delta debug statement.
     let mut delta = hddlog.transaction_commit_dump_changes().unwrap();
-    dump_delta(&delta);
+    // dump_delta(&delta);
     let ok_program = delta.get_rel(Relations::OkProgram as RelId);
     let mut new_result = false;
-    if prev_result {
-        for (_, weight) in ok_program.iter() {
-            if *weight == -1 {
-                println!("Program typing error ❌");
+    if !disable_output {
+        if prev_result {
+            for (_, weight) in ok_program.iter() {
+                if *weight == -1 {
+                    println!("Program typing error ❌");
+                }
             }
-        }
-        if ok_program.len() == 0 {
-            println!("Program correctly typed ✅");
-            new_result = true;
-        }
-    } else {
-        for (_, weight) in ok_program.iter() {
-            if *weight == 1 {
+            if ok_program.len() == 0 {
                 println!("Program correctly typed ✅");
                 new_result = true;
             }
-        }
-        if ok_program.len() == 0 {
-            println!("Program typing error ❌");
+        } else {
+            for (_, weight) in ok_program.iter() {
+                if *weight == 1 {
+                    println!("Program correctly typed ✅");
+                    new_result = true;
+                }
+            }
+            if ok_program.len() == 0 {
+                println!("Program typing error ❌");
+            }
         }
     }
     new_result

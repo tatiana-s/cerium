@@ -1,5 +1,6 @@
 use crate::definitions::{AstRelation, ID};
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 
 // For storing information about node location (will be useful for error reporting).
 #[derive(Debug, Clone, Copy)]
@@ -12,6 +13,12 @@ pub struct Tree {
     arena: HashMap<ID, AstNode>,
     max_id: ID,
     root_id: ID,
+}
+
+impl fmt::Display for Tree {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.max_id)
+    }
 }
 
 impl Tree {
