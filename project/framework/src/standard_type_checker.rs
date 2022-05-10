@@ -91,7 +91,8 @@ fn type_check_fun_def(
                     new_var_context.clone(),
                     new_fun_context.clone(),
                     fun_name,
-                ),
+                )
+                .0,
                 new_var_context,
                 new_fun_context,
             );
@@ -131,7 +132,7 @@ fn type_check_compound(
     var_context: HashMap<String, Type>,
     fun_context: HashMap<String, FunType>,
     current_fun: String,
-) -> Type {
+) -> (Type, HashMap<String, Type>) {
     match *node {
         AstRelation::Compound { id: _, start_id } => {
             return type_check_item(
@@ -152,7 +153,7 @@ fn type_check_item(
     var_context: HashMap<String, Type>,
     fun_context: HashMap<String, FunType>,
     current_fun: String,
-) -> Type {
+) -> (Type, HashMap<String, Type>) {
     match node {
         AstRelation::Item {
             id: _,
@@ -166,7 +167,7 @@ fn type_check_item(
                 fun_context.clone(),
                 current_fun.clone(),
             ) {
-                (Type::ErrorType, _) => Type::ErrorType,
+                (Type::ErrorType, _) => (Type::ErrorType, var_context),
                 (_, new_var_context) => {
                     return type_check_item(
                         ast.get_relation(next_stmt_id),
@@ -186,7 +187,6 @@ fn type_check_item(
                 fun_context,
                 current_fun,
             )
-            .0
         }
         _ => panic!("Unexpected syntax"),
     }
@@ -299,6 +299,94 @@ fn type_check_statement(
             Some(var_type) => return (var_type.clone(), var_context),
             None => panic!("Unexpected variable name"),
         },
+        AstRelation::If {
+            id: _,
+            cond_id,
+            then_id,
+        } => {
+            let (cond_type, new_var_context) = type_check_statement(
+                ast.get_relation(cond_id),
+                ast,
+                var_context.clone(),
+                fun_context.clone(),
+                current_fun.clone(),
+            );
+            let (then_type, new_var_context) = type_check_compound(
+                &ast.get_relation(then_id),
+                ast,
+                new_var_context,
+                fun_context.clone(),
+                current_fun.clone(),
+            );
+            let fun_type = fun_context.get(&current_fun).unwrap();
+            let return_type = fun_type.return_type.clone();
+            if cond_type == Type::IntType && then_type == return_type {
+                return (Type::OkType, new_var_context);
+            } else {
+                return (Type::ErrorType, new_var_context);
+            }
+        }
+        AstRelation::IfElse {
+            id: _,
+            cond_id,
+            then_id,
+            else_id,
+        } => {
+            let (cond_type, new_var_context) = type_check_statement(
+                ast.get_relation(cond_id),
+                ast,
+                var_context.clone(),
+                fun_context.clone(),
+                current_fun.clone(),
+            );
+            let (then_type, new_var_context) = type_check_compound(
+                &ast.get_relation(then_id),
+                ast,
+                new_var_context,
+                fun_context.clone(),
+                current_fun.clone(),
+            );
+            let (else_type, new_var_context) = type_check_compound(
+                &ast.get_relation(else_id),
+                ast,
+                new_var_context,
+                fun_context.clone(),
+                current_fun.clone(),
+            );
+            if cond_type == Type::IntType
+                && then_type != Type::ErrorType
+                && else_type != Type::ErrorType
+            {
+                return (Type::OkType, new_var_context);
+            } else {
+                return (Type::ErrorType, new_var_context);
+            }
+        }
+        AstRelation::While {
+            id: _,
+            cond_id,
+            body_id,
+        } => {
+            let (cond_type, new_var_context) = type_check_statement(
+                ast.get_relation(cond_id),
+                ast,
+                var_context.clone(),
+                fun_context.clone(),
+                current_fun.clone(),
+            );
+            let (body_type, new_var_context) = type_check_compound(
+                &ast.get_relation(body_id),
+                ast,
+                new_var_context,
+                fun_context.clone(),
+                current_fun.clone(),
+            );
+            if cond_type == Type::IntType && body_type != Type::ErrorType {
+                return (Type::OkType, new_var_context);
+            } else {
+                return (Type::ErrorType, new_var_context);
+            }
+        }
         AstRelation::Void { id: _ } => (Type::VoidType, var_context),
         AstRelation::Int { id: _ } => (Type::IntType, var_context),
         AstRelation::Float { id: _ } => (Type::FloatType, var_context),

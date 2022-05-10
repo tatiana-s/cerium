@@ -19,6 +19,7 @@ use differential_datalog::api::HDDlog;
 // Type-check a file once with the non-incremental type checker.
 pub fn single_standard_type_check(file_path: String) -> (bool, ast::Tree) {
     let ast = parser_interface::parse_file_into_ast(&file_path);
+    ast.pretty_print();
     return (standard_type_checker::type_check(&ast), ast);
 }
 

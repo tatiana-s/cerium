@@ -2,9 +2,9 @@ extern crate lang_c;
 
 use lang_c::ast as parse_ast;
 use lang_c::driver::{parse, Config};
-use lang_c::print::Printer;
+// use lang_c::print::Printer;
 use lang_c::span::Span;
-use lang_c::visit::*;
+// use lang_c::visit::*;
 
 use crate::ast::Tree;
 use crate::definitions::{AstRelation, ID};
@@ -18,9 +18,9 @@ fn parse_with_lang_c(file_path: &String) -> Tree {
     let parse_output = parse(&config, file_path);
     match parse_output {
         Ok(parse) => {
-            let s = &mut String::new();
-            Printer::new(s).visit_translation_unit(&parse.unit);
-            println!("{}", s);
+            // let s = &mut String::new();
+            // Printer::new(s).visit_translation_unit(&parse.unit);
+            // println!("{}", s);
             let mut ast_builder = AstBuilder::new();
             return AstBuilder::build_tree(&mut ast_builder, &parse.unit);
         }
