@@ -15,6 +15,7 @@ input relation Assign(id: ID, var_name: string, type_id: ID, expr_id: ID)
 input relation Return(id: ID, expr_id: ID)
 input relation If(id: ID, cond_id: ID, then_id: ID)
 input relation IfElse(id: ID, cond_id: ID, then_id: ID, else_id: ID)
+input relation While(id: ID, cond_id: ID, body_id: ID)
 input relation BinaryOp(id: ID, arg1_id: ID, arg2_id: ID)
 input relation Var(id: ID, var_name: string)
 input relation Arg(id: ID, var_name: string, type_id: ID)
@@ -91,7 +92,6 @@ TypedItem(id) :-
     TypedStatement(stmt_id).
 
 // Case: return statement inside compound so must match with function return type.
-// For simplicity I will assume the return statement is always at the end (TO-DO: but will have to fix this later).
 TypedReturnCompound(id, fun_return_type) :-
     Compound(id, start_id),
     TypedReturnItem(start_id, fun_return_type).
@@ -102,12 +102,17 @@ TypedReturnItem(id, fun_return_type) :-
     TypedReturnItem(next_stmt_id, fun_return_type).
 
 TypedReturnItem(id, fun_return_type) :-
+    Item(id, stmt_id, next_stmt_id),
+    TypedIfStatement(stmt_id, fun_return_type),
+    TypedReturnItem(next_stmt_id, fun_return_type).
+
+TypedReturnItem(id, fun_return_type) :-
     EndItem(id, stmt_id),
     TypedReturn(stmt_id, fun_return_type).
 
 TypedReturnItem(id, fun_return_type) :-
     EndItem(id, stmt_id),
-    TypedIfStatement(stmt_id, fun_return_type).
+    TypedIfElseStatement(stmt_id, fun_return_type).
 
 
 // Different types of statements: Assign, Return.
@@ -117,6 +122,7 @@ TypedReturnItem(id, fun_return_type) :-
 output relation TypedStatement(id: ID)
 output relation TypedReturn(id: ID, t: Type)
 output relation TypedIfStatement(id: ID, t: Type)
+output relation TypedIfElseStatement(id: ID, t:Type)
 
 TypedStatement(id) :-
     Assign(id, _, type_id, expr_id), 
@@ -133,7 +139,7 @@ TypedIfStatement(id, t) :-
     TypedExpr(cond_id, IntType),
     TypedReturnCompound(then_id, t).
 
-TypedIfStatement(id, t) :-
+TypedIfElseStatement(id, t) :-
     IfElse(id, cond_id, then_id, else_id),
     TypedExpr(cond_id, IntType),
     TypedReturnCompound(then_id, t),
@@ -144,11 +150,16 @@ TypedIfStatement(id, VoidType) :-
     TypedExpr(cond_id, IntType),
     TypedCompound(then_id).
 
-TypedIfStatement(id, VoidType) :-
+TypedIfElseStatement(id, VoidType) :-
     IfElse(id, cond_id, then_id, else_id),
     TypedExpr(cond_id, IntType),
     TypedCompound(then_id),
     TypedCompound(else_id).
+
+TypedStatement(id) :-
+    While(id, cond_id, body_id),
+    TypedExpr(cond_id, IntType),
+    TypedCompound(body_id).
 
 TypedReturn(id, t) :-
     Return(id, expr_id),
@@ -254,6 +265,35 @@ FindVarBinding(id, var_name, t) :-
 
 FindVarBinding(id, var_name, t) :-
     Item(_, next_id, id),
+    FindVarBinding(next_id, var_name, t).
+
+// -> also need to traverse if and while statements.
+FindVarBinding(id, var_name, t) :-
+    If(next_id, _, id),
+    FindVarBinding(next_id, var_name, t).
+
+FindVarBinding(id, var_name, t) :-
+    If(next_id, id, _),
+    FindVarBinding(next_id, var_name, t).
+
+FindVarBinding(id, var_name, t) :-
+    IfElse(next_id, _, id, _),
+    FindVarBinding(next_id, var_name, t).
+
+FindVarBinding(id, var_name, t) :-
+    IfElse(next_id, _, _, id),
+    FindVarBinding(next_id, var_name, t).
+
+FindVarBinding(id, var_name, t) :-
+    IfElse(next_id, id, _, _),
+    FindVarBinding(next_id, var_name, t).
+
+FindVarBinding(id, var_name, t) :-
+    While(next_id, _, id),
+    FindVarBinding(next_id, var_name, t).
+
+FindVarBinding(id, var_name, t) :-
+    While(next_id, id, _),
     FindVarBinding(next_id, var_name, t).
 
 // Similar approach for finding function definitions (since we don't have higher-order functions).

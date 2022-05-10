@@ -50,6 +50,11 @@ pub enum AstRelation {
         then_id: ID,
         else_id: ID,
     },
+    While {
+        id: ID,
+        cond_id: ID,
+        body_id: ID,
+    },
     // Items in compound to represent a sequence of statements.
     Compound {
         id: ID,

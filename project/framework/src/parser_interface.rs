@@ -223,6 +223,9 @@ impl<'a> AstBuilder {
             parse_ast::Statement::If(ref i) => {
                 return self.visit_if_statement(&i.node, &i.span);
             }
+            parse_ast::Statement::While(ref w) => {
+                return self.visit_while_statement(&w.node, &w.span);
+            }
             _ => panic!("Feature not implemented"),
         }
     }
@@ -281,6 +284,26 @@ impl<'a> AstBuilder {
         } else {
             panic!("Feature not implemented")
         }
+    }
+
+    fn visit_while_statement(
+        &mut self,
+        node: &'a parse_ast::WhileStatement,
+        _span: &'a Span,
+    ) -> ID {
+        let cond_id = self.visit_expression(&node.expression.node, &node.expression.span);
+        let body_id = self.visit_statement(&node.statement.node, &node.statement.span);
+        let node_id = self.current_max_id;
+        self.current_max_id = self.current_max_id + 1;
+        let relation = AstRelation::While {
+            id: node_id,
+            cond_id,
+            body_id,
+        };
+        self.tree.add_node(node_id, relation);
+        self.tree.link_child(node_id, cond_id);
+        self.tree.link_child(node_id, body_id);
+        return node_id;
     }
 
     fn visit_if_statement(&mut self, node: &'a parse_ast::IfStatement, _span: &'a Span) -> ID {
@@ -488,6 +511,17 @@ impl<'a> AstBuilder {
                 return node_id;
             }
             parse_ast::BinaryOperator::LogicalOr => {
+                let relation = AstRelation::BinaryOp {
+                    id: node_id,
+                    arg1_id,
+                    arg2_id,
+                };
+                self.tree.add_node(node_id, relation);
+                self.tree.link_child(node_id, arg1_id);
+                self.tree.link_child(node_id, arg2_id);
+                return node_id;
+            }
+            parse_ast::BinaryOperator::Assign => {
                 let relation = AstRelation::BinaryOp {
                     id: node_id,
                     arg1_id,
