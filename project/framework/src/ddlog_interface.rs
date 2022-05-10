@@ -167,6 +167,28 @@ fn get_equiv_ddvalue(ast_relation: &AstRelation) -> DDValue {
         }
         .into_ddvalue(),
         AstRelation::Return { id, expr_id } => Return { id, expr_id }.into_ddvalue(),
+        AstRelation::If {
+            id,
+            cond_id,
+            then_id,
+        } => If {
+            id,
+            cond_id,
+            then_id,
+        }
+        .into_ddvalue(),
+        AstRelation::IfElse {
+            id,
+            cond_id,
+            then_id,
+            else_id,
+        } => IfElse {
+            id,
+            cond_id,
+            then_id,
+            else_id,
+        }
+        .into_ddvalue(),
         AstRelation::Compound { id, start_id } => Compound { id, start_id }.into_ddvalue(),
         AstRelation::Item {
             id,

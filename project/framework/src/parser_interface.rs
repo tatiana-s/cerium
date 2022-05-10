@@ -2,9 +2,9 @@ extern crate lang_c;
 
 use lang_c::ast as parse_ast;
 use lang_c::driver::{parse, Config};
-// use lang_c::print::Printer;
+use lang_c::print::Printer;
 use lang_c::span::Span;
-// use lang_c::visit::*;
+use lang_c::visit::*;
 
 use crate::ast::Tree;
 use crate::definitions::{AstRelation, ID};
@@ -18,9 +18,9 @@ fn parse_with_lang_c(file_path: &String) -> Tree {
     let parse_output = parse(&config, file_path);
     match parse_output {
         Ok(parse) => {
-            // let s = &mut String::new();
-            // Printer::new(s).visit_translation_unit(&parse.unit);
-            // println!("{}", s);
+            let s = &mut String::new();
+            Printer::new(s).visit_translation_unit(&parse.unit);
+            println!("{}", s);
             let mut ast_builder = AstBuilder::new();
             return AstBuilder::build_tree(&mut ast_builder, &parse.unit);
         }
@@ -220,6 +220,9 @@ impl<'a> AstBuilder {
                 self.tree.link_child(node_id, expr_id);
                 return node_id;
             }
+            parse_ast::Statement::If(ref i) => {
+                return self.visit_if_statement(&i.node, &i.span);
+            }
             _ => panic!("Feature not implemented"),
         }
     }
@@ -277,6 +280,39 @@ impl<'a> AstBuilder {
             }
         } else {
             panic!("Feature not implemented")
+        }
+    }
+
+    fn visit_if_statement(&mut self, node: &'a parse_ast::IfStatement, _span: &'a Span) -> ID {
+        let cond_id = self.visit_expression(&node.condition.node, &node.condition.span);
+        let then_id = self.visit_statement(&node.then_statement.node, &node.then_statement.span);
+        if let Some(ref e) = node.else_statement {
+            let else_id = self.visit_statement(&e.node, &e.span);
+            let node_id = self.current_max_id;
+            self.current_max_id = self.current_max_id + 1;
+            let relation = AstRelation::IfElse {
+                id: node_id,
+                cond_id,
+                then_id,
+                else_id,
+            };
+            self.tree.add_node(node_id, relation);
+            self.tree.link_child(node_id, cond_id);
+            self.tree.link_child(node_id, then_id);
+            self.tree.link_child(node_id, else_id);
+            return node_id;
+        } else {
+            let node_id = self.current_max_id;
+            self.current_max_id = self.current_max_id + 1;
+            let relation = AstRelation::If {
+                id: node_id,
+                cond_id,
+                then_id,
+            };
+            self.tree.add_node(node_id, relation);
+            self.tree.link_child(node_id, cond_id);
+            self.tree.link_child(node_id, then_id);
+            return node_id;
         }
     }
 
@@ -375,6 +411,83 @@ impl<'a> AstBuilder {
                 return node_id;
             }
             parse_ast::BinaryOperator::Divide => {
+                let relation = AstRelation::BinaryOp {
+                    id: node_id,
+                    arg1_id,
+                    arg2_id,
+                };
+                self.tree.add_node(node_id, relation);
+                self.tree.link_child(node_id, arg1_id);
+                self.tree.link_child(node_id, arg2_id);
+                return node_id;
+            }
+            parse_ast::BinaryOperator::Greater => {
+                let relation = AstRelation::BinaryOp {
+                    id: node_id,
+                    arg1_id,
+                    arg2_id,
+                };
+                self.tree.add_node(node_id, relation);
+                self.tree.link_child(node_id, arg1_id);
+                self.tree.link_child(node_id, arg2_id);
+                return node_id;
+            }
+            parse_ast::BinaryOperator::GreaterOrEqual => {
+                let relation = AstRelation::BinaryOp {
+                    id: node_id,
+                    arg1_id,
+                    arg2_id,
+                };
+                self.tree.add_node(node_id, relation);
+                self.tree.link_child(node_id, arg1_id);
+                self.tree.link_child(node_id, arg2_id);
+                return node_id;
+            }
+            parse_ast::BinaryOperator::Less => {
+                let relation = AstRelation::BinaryOp {
+                    id: node_id,
+                    arg1_id,
+                    arg2_id,
+                };
+                self.tree.add_node(node_id, relation);
+                self.tree.link_child(node_id, arg1_id);
+                self.tree.link_child(node_id, arg2_id);
+                return node_id;
+            }
+            parse_ast::BinaryOperator::LessOrEqual => {
+                let relation = AstRelation::BinaryOp {
+                    id: node_id,
+                    arg1_id,
+                    arg2_id,
+                };
+                self.tree.add_node(node_id, relation);
+                self.tree.link_child(node_id, arg1_id);
+                self.tree.link_child(node_id, arg2_id);
+                return node_id;
+            }
+            parse_ast::BinaryOperator::Equals => {
+                let relation = AstRelation::BinaryOp {
+                    id: node_id,
+                    arg1_id,
+                    arg2_id,
+                };
+                self.tree.add_node(node_id, relation);
+                self.tree.link_child(node_id, arg1_id);
+                self.tree.link_child(node_id, arg2_id);
+                return node_id;
+            }
+            parse_ast::BinaryOperator::LogicalAnd => {
+                let relation = AstRelation::BinaryOp {
+                    id: node_id,
+                    arg1_id,
+                    arg2_id,
+                };
+                self.tree.add_node(node_id, relation);
+                self.tree.link_child(node_id, arg1_id);
+                self.tree.link_child(node_id, arg2_id);
+                return node_id;
+            }
+            parse_ast::BinaryOperator::LogicalOr => {
                 let relation = AstRelation::BinaryOp {
                     id: node_id,
                     arg1_id,

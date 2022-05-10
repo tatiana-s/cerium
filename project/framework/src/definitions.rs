@@ -39,6 +39,17 @@ pub enum AstRelation {
         id: ID,
         expr_id: ID,
     },
+    If {
+        id: ID,
+        cond_id: ID,
+        then_id: ID,
+    },
+    IfElse {
+        id: ID,
+        cond_id: ID,
+        then_id: ID,
+        else_id: ID,
+    },
     // Items in compound to represent a sequence of statements.
     Compound {
         id: ID,

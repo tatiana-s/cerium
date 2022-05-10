@@ -13,6 +13,8 @@ input relation Item(id: ID, stmt_id: ID, next_stmt_id: ID)
 input relation EndItem(id: ID, stmt_id: ID)
 input relation Assign(id: ID, var_name: string, type_id: ID, expr_id: ID)
 input relation Return(id: ID, expr_id: ID)
+input relation If(id: ID, cond_id: ID, then_id: ID)
+input relation IfElse(id: ID, cond_id: ID, then_id: ID, else_id: ID)
 input relation BinaryOp(id: ID, arg1_id: ID, arg2_id: ID)
 input relation Var(id: ID, var_name: string)
 input relation Arg(id: ID, var_name: string, type_id: ID)
@@ -103,6 +105,10 @@ TypedReturnItem(id, fun_return_type) :-
     EndItem(id, stmt_id),
     TypedReturn(stmt_id, fun_return_type).
 
+TypedReturnItem(id, fun_return_type) :-
+    EndItem(id, stmt_id),
+    TypedIfStatement(stmt_id, fun_return_type).
+
 
 // Different types of statements: Assign, Return.
 // Return has a type so it can be checked against function return types.
@@ -110,6 +116,7 @@ TypedReturnItem(id, fun_return_type) :-
 // Additionally any expression can be a statement.
 output relation TypedStatement(id: ID)
 output relation TypedReturn(id: ID, t: Type)
+output relation TypedIfStatement(id: ID, t: Type)
 
 TypedStatement(id) :-
     Assign(id, _, type_id, expr_id), 
@@ -118,10 +125,34 @@ TypedStatement(id) :-
 TypedStatement(id) :-
     TypedExpr(id, _).
 
+TypedStatement(id) :-
+    TypedIfStatement(id, _).
+
+TypedIfStatement(id, t) :-
+    If(id, cond_id, then_id),
+    TypedExpr(cond_id, IntType),
+    TypedReturnCompound(then_id, t).
+
+TypedIfStatement(id, t) :-
+    IfElse(id, cond_id, then_id, else_id),
+    TypedExpr(cond_id, IntType),
+    TypedReturnCompound(then_id, t),
+    TypedReturnCompound(else_id, t).
+
+TypedIfStatement(id, VoidType) :-
+    If(id, cond_id, then_id),
+    TypedExpr(cond_id, IntType),
+    TypedCompound(then_id).
+
+TypedIfStatement(id, VoidType) :-
+    IfElse(id, cond_id, then_id, else_id),
+    TypedExpr(cond_id, IntType),
+    TypedCompound(then_id),
+    TypedCompound(else_id).
+
 TypedReturn(id, t) :-
     Return(id, expr_id),
     TypedExpr(expr_id, t).
-
 
 // Different types of expressions: literals, variables, function calls, binary operators.
 output relation TypedExpr(id: ID, t: Type)

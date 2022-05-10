@@ -87,6 +87,12 @@ impl Tree {
             .pretty_print(&String::from(""), &self.arena);
     }
 
+    pub fn flat_print(&self) {
+        for node in &self.arena {
+            println!("{:?}", node.1.relation);
+        }
+    }
+
     pub fn get_root(&self) -> ID {
         self.root_id
     }
@@ -744,6 +750,51 @@ fn delete_onwards(node_id: ID, mut ast: Tree) -> (HashSet<AstRelation>, Tree) {
             }
             return (delete_set, updated_ast);
         }
+        AstRelation::IfElse {
+            id: _,
+            cond_id,
+            then_id,
+            else_id,
+        } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let (child_set, updated_ast) = delete_onwards(cond_id, ast);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
+            let (child_set, updated_ast) = delete_onwards(then_id, updated_ast);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
+            let (child_set, updated_ast) = delete_onwards(else_id, updated_ast);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
+            return (delete_set, updated_ast);
+        }
+        AstRelation::If {
+            id: _,
+            cond_id,
+            then_id,
+        } => {
+            delete_set.insert(relation_to_be_deleted);
+            ast.delete_node(node_id);
+            if node_id == ast.max_id {
+                ast.max_id = *ast.arena.keys().max().unwrap();
+            }
+            let (child_set, updated_ast) = delete_onwards(cond_id, ast);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
+            let (child_set, updated_ast) = delete_onwards(then_id, updated_ast);
+            for relation in child_set {
+                delete_set.insert(relation);
+            }
+            return (delete_set, updated_ast);
+        }
         AstRelation::Return { id: _, expr_id } => {
             delete_set.insert(relation_to_be_deleted);
             ast.delete_node(node_id);
@@ -1000,6 +1051,68 @@ fn insert_onwards(node_id: ID, mut ast: Tree, new_ast: Tree) -> (HashSet<AstRela
             insertion_set.insert(new_relation.clone());
             updated_ast.add_node(new_id, new_relation);
             updated_ast.link_child(new_id, start_child_id);
+            return (insertion_set, updated_ast, new_id);
+        }
+        AstRelation::IfElse {
+            id: _,
+            cond_id,
+            then_id,
+            else_id,
+        } => {
+            let (insertions, updated_ast, cond_child_id) =
+                insert_onwards(cond_id, ast, new_ast.clone());
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
+            let (insertions, updated_ast, then_child_id) =
+                insert_onwards(then_id, updated_ast, new_ast.clone());
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
+            let (insertions, mut updated_ast, else_child_id) =
+                insert_onwards(else_id, updated_ast, new_ast);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
+            let new_id = updated_ast.max_id + 1;
+            let new_relation = AstRelation::IfElse {
+                id: new_id,
+                cond_id: cond_child_id,
+                then_id: then_child_id,
+                else_id: else_child_id,
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.link_child(new_id, cond_child_id);
+            updated_ast.link_child(new_id, then_child_id);
+            updated_ast.link_child(new_id, else_child_id);
+            return (insertion_set, updated_ast, new_id);
+        }
+        AstRelation::If {
+            id: _,
+            cond_id,
+            then_id,
+        } => {
+            let (insertions, updated_ast, cond_child_id) =
+                insert_onwards(cond_id, ast, new_ast.clone());
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
+            let (insertions, mut updated_ast, then_child_id) =
+                insert_onwards(then_id, updated_ast, new_ast);
+            for relation in insertions {
+                insertion_set.insert(relation);
+            }
+            let new_id = updated_ast.max_id + 1;
+            let new_relation = AstRelation::If {
+                id: new_id,
+                cond_id: cond_child_id,
+                then_id: then_child_id,
+            };
+            insertion_set.insert(new_relation.clone());
+            updated_ast.add_node(new_id, new_relation);
+            updated_ast.link_child(new_id, cond_child_id);
+            updated_ast.link_child(new_id, then_child_id);
             return (insertion_set, updated_ast, new_id);
         }
         AstRelation::Return { id: _, expr_id } => {
@@ -1272,6 +1385,61 @@ fn relations_match(r1: &AstRelation, r2: &AstRelation, t1: &Tree, t2: &Tree) -> 
             )
         }
         (
+            AstRelation::If {
+                id: _,
+                cond_id: cond_id1,
+                then_id: then_id1,
+            },
+            AstRelation::If {
+                id: _,
+                cond_id: cond_id2,
+                then_id: then_id2,
+            },
+        ) => {
+            return relations_match(
+                &t1.get_relation(*then_id1),
+                &t2.get_relation(*then_id2),
+                t1,
+                t2,
+            ) && relations_match(
+                &t1.get_relation(*cond_id1),
+                &t2.get_relation(*cond_id2),
+                t1,
+                t2,
+            )
+        }
+        (
+            AstRelation::IfElse {
+                id: _,
+                cond_id: cond_id1,
+                then_id: then_id1,
+                else_id: else_id1,
+            },
+            AstRelation::IfElse {
+                id: _,
+                cond_id: cond_id2,
+                then_id: then_id2,
+                else_id: else_id2,
+            },
+        ) => {
+            return relations_match(
+                &t1.get_relation(*then_id1),
+                &t2.get_relation(*then_id2),
+                t1,
+                t2,
+            ) && relations_match(
+                &t1.get_relation(*cond_id1),
+                &t2.get_relation(*cond_id2),
+                t1,
+                t2,
+            ) && relations_match(
+                &t1.get_relation(*else_id1),
+                &t2.get_relation(*else_id2),
+                t1,
+                t2,
+            )
+        }
+        (
             AstRelation::Return {
                 id: _,
                 expr_id: expr_id1,
@@ -1388,6 +1556,17 @@ pub fn get_relation_id(r: &AstRelation) -> ID {
             next_stmt_id: _,
         } => return *id,
         AstRelation::Compound { id, start_id: _ } => return *id,
+        AstRelation::IfElse {
+            id,
+            cond_id: _,
+            then_id: _,
+            else_id: _,
+        } => return *id,
+        AstRelation::If {
+            id,
+            cond_id: _,
+            then_id: _,
+        } => return *id,
         AstRelation::Return { id, expr_id: _ } => return *id,
         AstRelation::Assign {
             id,
