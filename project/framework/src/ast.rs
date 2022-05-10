@@ -108,6 +108,7 @@ impl Tree {
 
     pub fn delete_node(&mut self, node_id: ID) {
         self.arena.remove(&node_id);
+        self.max_id = *self.arena.keys().max().unwrap();
     }
 }
 
@@ -277,11 +278,14 @@ pub fn get_diff_relation_set(
                                                     };
                                                     updated_tree
                                                         .update_relation(id, replacement.clone());
+                                                    updated_tree
+                                                        .replace_children(id, vec![type_id1]);
                                                     insertion_set.insert(replacement);
                                                 }
                                             }
                                             _ => panic!("Unexpected node during diffing"),
                                         }
+                                        remaining_args.push(*prev_arg_id);
                                     } else {
                                         // This means the previous argument list was longer so we need to delete some.
                                         let (deletions, new_updated_tree) =
@@ -296,7 +300,7 @@ pub fn get_diff_relation_set(
                                 // This means there are more arguments in the new tree.
                                 if new_arg_ids.len() > prev_arg_ids.len() {
                                     for (index, new_arg_id) in new_arg_ids.iter().enumerate() {
-                                        if index > prev_arg_ids.len() {
+                                        if index >= prev_arg_ids.len() {
                                             let (insertions, new_updated_tree, updated_arg_id) =
                                                 insert_onwards(
                                                     *new_arg_id,
@@ -319,11 +323,14 @@ pub fn get_diff_relation_set(
                                         fun_name: prev_fun_name,
                                         return_type_id: prev_return_type_id,
                                         // Just change arguments.
-                                        arg_ids: remaining_args,
+                                        arg_ids: remaining_args.clone(),
                                         body_id: prev_body_id,
                                     };
                                     insertion_set.insert(replacement.clone());
                                     updated_tree.update_relation(prev_id, replacement);
+                                    updated_tree.replace_children(prev_id, remaining_args);
+                                    updated_tree.link_child(prev_id, prev_return_type_id);
+                                    updated_tree.link_child(prev_id, prev_body_id);
                                 }
 
                                 // Compare function bodies.
@@ -397,14 +404,24 @@ pub fn get_diff_relation_set(
         }
     }
     // Replace root with translation unit that has the correct list of declarations.
-    deletion_set.insert(prev_ast.get_relation(prev_ast.get_root()));
-    let final_root = AstRelation::TransUnit {
-        id: prev_ast.get_root(),
-        body_ids: remaining_funs,
-    };
-    insertion_set.insert(final_root.clone());
-    updated_tree.update_relation(prev_ast.get_root(), final_root);
+    let mut prev_funs = vec![];
+    if let AstRelation::TransUnit { id: _, body_ids } = prev_ast.get_relation(prev_ast.get_root()) {
+        prev_funs = body_ids;
+    }
+    if !(remaining_funs.iter().all(|item| prev_funs.contains(item)))
+        || !(prev_funs.iter().all(|item| remaining_funs.contains(item)))
+    {
+        deletion_set.insert(prev_ast.get_relation(prev_ast.get_root()));
+        let final_root = AstRelation::TransUnit {
+            id: prev_ast.get_root(),
+            body_ids: remaining_funs.clone(),
+        };
+        insertion_set.insert(final_root.clone());
+        updated_tree.update_relation(prev_ast.get_root(), final_root);
+        updated_tree.replace_children(prev_ast.get_root(), remaining_funs);
+    }
     // Return result.
+    updated_tree.pretty_print();
     (insertion_set, deletion_set, updated_tree)
 }
 
@@ -457,6 +474,7 @@ fn compare_items(
                     insertion_set.insert(replacement.clone());
                     deletion_set.insert(item1_clone);
                     updated_tree.update_relation(id1, replacement);
+                    updated_tree.replace_children(id1, vec![stmt_id1, next_id]);
                     return (insertion_set, deletion_set, updated_tree, id1);
                 } else {
                     return (insertions, deletions, updated_tree, id1);
@@ -464,7 +482,7 @@ fn compare_items(
             } else {
                 // Otherwise: keep comparing the prev item and insert a new item.
                 let (insertions, deletions, updated_tree, next_id) =
-                    compare_items(next_stmt_id1, next_stmt_id2, t1, t2.clone());
+                    compare_items(id1, next_stmt_id2, t1, t2.clone());
                 for relation in insertions {
                     insertion_set.insert(relation);
                 }
@@ -489,7 +507,6 @@ fn compare_items(
                 return (insertion_set, deletion_set, updated_tree, new_id);
             }
         }
-        // Case: we reached the end of the compound in the prev tree and have to insert the rest of the new one.
         (
             AstRelation::EndItem {
                 id: id1,
@@ -522,15 +539,37 @@ fn compare_items(
                 insertion_set.insert(replacement.clone());
                 deletion_set.insert(item1_clone);
                 updated_tree.update_relation(id1, replacement);
+                updated_tree.replace_children(id1, vec![stmt_id1, next_item]);
                 return (insertion_set, deletion_set, updated_tree, id1);
             } else {
-                // Just insert from whole item onwards (basically skip other).
-                let (insertions, updated_tree, next_item) = insert_onwards(next_stmt_id2, t1, t2);
-                return (insertions, deletion_set, updated_tree, next_item);
+                // Otherwise: keep comparing the prev item and insert a new item.
+                let (insertions, deletions, updated_tree, next_id) =
+                    compare_items(id1, next_stmt_id2, t1, t2.clone());
+                for relation in insertions {
+                    insertion_set.insert(relation);
+                }
+                for relation in deletions {
+                    deletion_set.insert(relation);
+                }
+                let (insertions, mut new_updated_tree, stmt_id) =
+                    insert_onwards(stmt_id2, updated_tree, t2);
+                for relation in insertions {
+                    insertion_set.insert(relation);
+                }
+                let new_id = new_updated_tree.max_id + 1;
+                let new_item = AstRelation::Item {
+                    id: new_id,
+                    stmt_id: stmt_id,
+                    next_stmt_id: next_id,
+                };
+                insertion_set.insert(new_item.clone());
+                new_updated_tree.add_node(new_id, new_item);
+                new_updated_tree.link_child(new_id, stmt_id);
+                new_updated_tree.link_child(new_id, next_id);
+                return (insertion_set, deletion_set, new_updated_tree, new_id);
             }
         }
         (
-            // Case: we reached the end of the compound in the new tree and have to delete the rest of the prev one.
             AstRelation::Item {
                 id: id1,
                 stmt_id: stmt_id1,
@@ -560,6 +599,7 @@ fn compare_items(
                 insertion_set.insert(replacement.clone());
                 deletion_set.insert(item1_clone);
                 updated_tree.update_relation(id1, replacement);
+                updated_tree.replace_children(id1, vec![stmt_id1]);
                 return (insertion_set, deletion_set, updated_tree, id1);
             } else {
                 // Delete from next statement onwards.
@@ -581,6 +621,7 @@ fn compare_items(
                 insertion_set.insert(replacement.clone());
                 deletion_set.insert(item1_clone);
                 updated_tree.update_relation(id1, replacement);
+                updated_tree.replace_children(id1, vec![stmt_id]);
                 return (insertion_set, deletion_set, updated_tree, id1);
             }
         }
@@ -614,6 +655,7 @@ fn compare_items(
                 insertion_set.insert(replacement.clone());
                 deletion_set.insert(item1_clone);
                 updated_tree.update_relation(id1, replacement);
+                updated_tree.replace_children(id1, vec![stmt_id]);
                 return (insertion_set, deletion_set, updated_tree, id1);
             }
         }

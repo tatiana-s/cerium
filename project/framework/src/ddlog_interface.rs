@@ -25,8 +25,8 @@ pub fn run_ddlog_type_checker(
     prev_result: bool,
     disable_output: bool,
 ) -> bool {
-    //println!("{:?}", insert_set);
-    //println!("{:?}", delete_set);
+    println!("{:?}", insert_set);
+    println!("{:?}", delete_set);
     // Start transaction.
     hddlog.transaction_start().unwrap();
     // Updates.
@@ -45,7 +45,7 @@ pub fn run_ddlog_type_checker(
     // See result.
     // Comment/uncomment dump delta debug statement.
     let mut delta = hddlog.transaction_commit_dump_changes().unwrap();
-    dump_delta(&delta);
+    // dump_delta(&delta);
     let ok_program = delta.get_rel(Relations::OkProgram as RelId);
     let mut new_result = false;
     if !disable_output {
