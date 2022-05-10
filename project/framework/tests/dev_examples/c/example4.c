@@ -1,14 +1,4 @@
-char id(char x)
-{
-    return x;
-}
-
-float f(float y)
-{
-    return y;
-}
-
-int g(int x)
+int id(int x)
 {
     return x;
 }
