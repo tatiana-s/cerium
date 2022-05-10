@@ -1,0 +1,9 @@
+This example program is based on Project Euler solutions from the "TheAlgorithms/C" repository distributed under the GPL license (see https://github.com/TheAlgorithms/C/tree/master/project_euler). 
+
+They are modified in order to adhere to the feature set the type checker supports and therefore semantically don't have the original meaning.
+
+The license and source is included in this extra file because the actual code examples can't include comments because they are not currently supported by the parser interface.
+
+The problem solutions (with link to base code) included are:
+- problem 1 (https://github.com/TheAlgorithms/C/blob/master/project_euler/problem_1/sol1.c)
+- problem 2 (https://github.com/TheAlgorithms/C/blob/master/project_euler/problem_2/so1.c)

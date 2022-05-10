@@ -154,7 +154,6 @@ impl<'a> AstBuilder {
     fn visit_statement(&mut self, node: &'a parse_ast::Statement, _span: &'a Span) -> ID {
         match *node {
             parse_ast::Statement::Compound(ref c) => {
-                // TO-DO: check whether there's a better way to initialize this.
                 let mut next_stmt_id = 0;
                 let mut start_id = 0;
                 let mut counter = 0;
@@ -226,7 +225,10 @@ impl<'a> AstBuilder {
             parse_ast::Statement::While(ref w) => {
                 return self.visit_while_statement(&w.node, &w.span);
             }
-            _ => panic!("Feature not implemented"),
+            _ => {
+                println!("{:?}", node);
+                panic!("Feature not implemented");
+            }
         }
     }
 
