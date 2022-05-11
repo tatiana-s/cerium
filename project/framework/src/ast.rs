@@ -421,7 +421,7 @@ pub fn get_diff_relation_set(
         updated_tree.replace_children(prev_ast.get_root(), remaining_funs);
     }
     // Return result.
-    updated_tree.pretty_print();
+    // updated_tree.pretty_print();
     (insertion_set, deletion_set, updated_tree)
 }
 

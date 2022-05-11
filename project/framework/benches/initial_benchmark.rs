@@ -6,12 +6,16 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("Program 1 Initial Run");
     group.bench_function("Standard", |b| {
         b.iter(|| {
-            single_standard_type_check(String::from("./benches/dataset/program1/program1_1.c"))
+            single_standard_type_check(String::from(
+                "./benches/dataset/program2/4_program2_original.c",
+            ))
         })
     });
     group.bench_function("Incremental", |b| {
         b.iter(|| {
-            single_datalog_type_check(String::from("./benches/dataset/program1/program1_1.c"))
+            single_datalog_type_check(String::from(
+                "./benches/dataset/program2/4_program2_original.c",
+            ))
         })
     });
     group.finish();

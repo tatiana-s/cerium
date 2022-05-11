@@ -17,11 +17,13 @@ pub fn set_up_datalog() -> IncrementalInput {
     // Create instance of the DDlog type checking program.
     let (hddlog, _) = type_checker_ddlog::run(1, false).unwrap();
     // Run initial type checking run.
-    let (initial_result, initial_ast) =
-        single_datalog_type_check(String::from("./benches/dataset/program1/program1_1.c"));
+    let (initial_result, initial_ast) = single_datalog_type_check(String::from(
+        "./benches/dataset/program2/3_program2_original.c",
+    ));
     // Parse modified file.
-    let modified_ast =
-        parse_into_relation_tree(String::from("./benches/dataset/program1/program1_2.c"));
+    let modified_ast = parse_into_relation_tree(String::from(
+        "./benches/dataset/program2/3_program2_change.c",
+    ));
     // Compute program delta.
     let (insertion_set, deletion_set, _) = compute_diff(initial_ast, modified_ast);
     return IncrementalInput::new(initial_result, hddlog, insertion_set, deletion_set);
@@ -29,7 +31,9 @@ pub fn set_up_datalog() -> IncrementalInput {
 
 pub fn set_up_standard() -> ast::Tree {
     // For standard type checker we can just immediately parse the modified file here.
-    return parse_into_relation_tree(String::from("./benches/dataset/program1/program1_2.c"));
+    return parse_into_relation_tree(String::from(
+        "./benches/dataset/program2/3_program2_change.c",
+    ));
 }
 #[derive(Debug)]
 pub struct IncrementalInput {
@@ -68,9 +72,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let datalog_input = set_up_datalog();
     // Contains just parsed AST.
     let standard_input = set_up_standard();
-    let mut group = c.benchmark_group("Program 1 - Incremental Change 1");
+    let mut group = c.benchmark_group("Program 2 - Incremental Change 1");
     group.bench_with_input(
-        BenchmarkId::new("standard_input", standard_input.clone()),
+        BenchmarkId::new("Standard", standard_input.clone()),
         &standard_input,
         |b, s| {
             b.iter(|| {

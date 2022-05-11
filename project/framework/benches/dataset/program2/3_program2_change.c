@@ -309,7 +309,7 @@ int problem2_7(void)
 int problem1_8(void)
 {
     int t = 0;
-    int float = 0;
+    float sum = 0;
     while (t)
     {
         t = t - 1;
