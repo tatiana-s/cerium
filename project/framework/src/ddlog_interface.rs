@@ -104,7 +104,6 @@ fn dump_delta(delta: &DeltaMap<DDValue>) {
 }
 
 // Need to do some type conversion to convert to DDlog vectors and relations.
-// (TO-DO: maybe automate this as a macro?)
 fn get_equiv_ddvalue(ast_relation: &AstRelation) -> DDValue {
     match ast_relation.clone() {
         AstRelation::TransUnit { id, body_ids } => {

@@ -569,7 +569,6 @@ impl<'a> AstBuilder {
         body_id: ID,
     ) -> ID {
         let fun_name = self.visit_declarator_kind(&node.kind.node, &node.kind.span);
-        // TO-DO: figure out in which case you have multiple derived declarators/what extensions are.
         let mut arg_ids = vec![];
         for derived in &node.derived {
             arg_ids = self.visit_derived_declarator(&derived.node, &derived.span);

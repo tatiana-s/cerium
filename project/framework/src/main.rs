@@ -39,7 +39,7 @@ fn main() {
 
     // Type check initial input file.
     let ast = parser_interface::parse_file_into_ast(file_path);
-    // ast.pretty_print();
+    ast.pretty_print();
     // ast.flat_print();
     let insert_set: HashSet<definitions::AstRelation> = ast::get_initial_relation_set(&ast);
     let delete_set: HashSet<definitions::AstRelation> = HashSet::new();
@@ -47,7 +47,6 @@ fn main() {
         ddlog_interface::run_ddlog_type_checker(&hddlog, insert_set, delete_set, false, false);
 
     // Continue watching the file for changes.
-    // TO-DO: add support for type-checking directories.
     if let Err(e) = cerium_framework::incremental_type_check(file_path, &ast, hddlog, result) {
         println!("error: {:?}", e)
     }

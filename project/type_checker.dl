@@ -32,7 +32,6 @@ output relation OkProgram(id: ID)
 Program(id) :-
     TransUnit(id, _).
 
-// TO-DO: Remove output before every intermediate relation in final version (add for debugging purposes).
 // A translation unit is well-typed if all declarations in it are well-typed.
 output relation TypedTransUnit(id: ID)
 output relation BodyErrorTransUnit(id: ID)
@@ -117,7 +116,6 @@ TypedReturnItem(id, fun_return_type) :-
 
 // Different types of statements: Assign, Return.
 // Return has a type so it can be checked against function return types.
-// TO-DO: add compound for scopes (will be needed for control flow anyway I think).
 // Additionally any expression can be a statement.
 output relation TypedStatement(id: ID)
 output relation TypedReturn(id: ID, t: Type)
@@ -312,7 +310,6 @@ FindFunBinding(id, fun_name, return_type, arg_type_ids) :-
 
 
 // Helper relations.
-// TO-DO: review whether these are necessary/convinient or it could just be inlined.
 relation TypesMatch(id1: ID, id2: ID)
 
 // Rule for seeing if types match.

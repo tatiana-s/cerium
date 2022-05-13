@@ -20,12 +20,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
     let initial_ast = parse_into_relation_tree(String::from(
-        "./benches/dataset/program2/4_program2_original.c",
+        "./benches/dataset/program1/0_program1_original.c",
     ));
     group.bench_function("Initial parse", |b| {
         b.iter(|| {
             parse_into_relation_tree(String::from(
-                "./benches/dataset/program2/4_program2_original.c",
+                "./benches/dataset/program1/0_program1_original.c",
             ));
         })
     });
@@ -52,12 +52,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
     let modified_ast = parse_into_relation_tree(String::from(
-        "./benches/dataset/program2/4_program2_change.c",
+        "./benches/dataset/program1/0_program1_original.c",
     ));
     group.bench_function("Modified parse", |b| {
         b.iter(|| {
             parse_into_relation_tree(String::from(
-                "./benches/dataset/program2/4_program2_change.c",
+                "./benches/dataset/program1/0_program1_original.c",
             ));
         })
     });

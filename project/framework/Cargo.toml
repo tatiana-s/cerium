@@ -22,3 +22,7 @@ criterion = "0.3"
 [[bench]]
 name = "changes_benchmark"
 harness = false
+
+[[bench]]
+name = "stages_benchmark"
+harness = false

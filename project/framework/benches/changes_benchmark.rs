@@ -18,11 +18,11 @@ pub fn set_up_datalog() -> IncrementalInput {
     let (hddlog, _) = type_checker_ddlog::run(1, false).unwrap();
     // Run initial type checking run.
     let (initial_result, initial_ast) = single_datalog_type_check(String::from(
-        "./benches/dataset/program2/3_program2_original.c",
+        "./benches/dataset/program1/0_program1_original.c",
     ));
     // Parse modified file.
     let modified_ast = parse_into_relation_tree(String::from(
-        "./benches/dataset/program2/3_program2_change.c",
+        "./benches/dataset/program1/0_program1_original.c",
     ));
     // Compute program delta.
     let (insertion_set, deletion_set, _) = compute_diff(initial_ast, modified_ast);
@@ -32,7 +32,7 @@ pub fn set_up_datalog() -> IncrementalInput {
 pub fn set_up_standard() -> ast::Tree {
     // For standard type checker we can just immediately parse the modified file here.
     return parse_into_relation_tree(String::from(
-        "./benches/dataset/program2/3_program2_change.c",
+        "./benches/dataset/program1/0_program1_original.c",
     ));
 }
 #[derive(Debug)]
